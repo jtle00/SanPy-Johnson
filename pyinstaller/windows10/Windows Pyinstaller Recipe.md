@@ -85,7 +85,6 @@ exe = EXE(
 )
 
 ```
-
 Changing the line of ```console=True``` to ```console=False``` inside the script will remove the terminal console that shows errors. For later distribution we will need to set ```console=False``` so that users do not have to see the console.
 
 Modify path lines to include your user directories by replacing "johns" to run this .spec file on your own system
