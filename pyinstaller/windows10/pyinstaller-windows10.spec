@@ -12,7 +12,6 @@ a = Analysis(
         ('../sanpy/_userFiles','_userFiles')],
     hiddenimports=['tables', 'pkg_resources'],
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
