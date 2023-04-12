@@ -1,6 +1,6 @@
 #python==3.9
 pyinstaller==5.2
-pyqtgraph==0.13.1
+#pyqtgraph==0.13.1
 PyQt5==5.15.4
 
 numpy
@@ -16,7 +16,7 @@ tables
 scikit-image==0.19.3
 h5py
 qtpy
-#pyqtgraph
+pyqtgraph
 pyqtdarktheme
 #PyQt5
 pywin32
