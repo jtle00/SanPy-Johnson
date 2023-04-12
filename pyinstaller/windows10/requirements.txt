@@ -1,25 +1,19 @@
-pandas
 numpy
+pandas==1.5
 scipy
-
-qtpy
-#PyQt5==5.12 # 5.12 is only version where combox boxes work # 5.15.2
-PyQt5
-pyqtgraph
-matplotlib
-mplcursors #  added 202102 for bScatterPlotWidget2 (to show popup on hover)
 pyabf
-XlsxWriter
-qdarkstyle #  qdarkstyle==2.8.1
-xlrd  # for loading excel files in examples/reanalyze.py
-openpyxl  # for loading .xlsx
-seaborn
-openpyxl  # to open newer xlsx files
 tifffile
-tables  # to load/save with pandas HDFStore
-boto3  # for Amazon AWS, try and remove and just install if used. 202109
-scikit-image
+matplotlib
+mplcursors
+seaborn
+requests
+tables
+scikit-image==0.19.3
 h5py
+qtpy
+pyqtgraph
+pyqtdarktheme
+PyQt5
 pywin32
 tornado
 windows-curses
