@@ -40,7 +40,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='..\\sanpy\\interface\\icons\\sanpy_transparent.icns',
+    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.icns',
 )
 coll = COLLECT(
     exe,
