@@ -19,7 +19,7 @@ qtpy
 pyqtgraph
 pyqtdarktheme
 #PyQt5
-pywin32
+#pywin32
 tornado
 windows-curses
 #pyinstaller
