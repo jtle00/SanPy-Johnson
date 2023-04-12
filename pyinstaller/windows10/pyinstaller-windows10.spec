@@ -34,7 +34,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -42,13 +42,4 @@ exe = EXE(
     entitlements_file=None,
     icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico',
 )
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='SanPy-Windows10',
-)
+
