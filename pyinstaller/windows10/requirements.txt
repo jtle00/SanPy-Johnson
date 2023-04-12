@@ -22,3 +22,4 @@ scikit-image
 h5py
 pywin32
 tornado
+windows-curses
