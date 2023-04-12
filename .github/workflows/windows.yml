@@ -13,13 +13,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.9' 
         
     - name: Package Application
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
+        python-version: '3.9' 
         path: pyinstaller/windows10
 
     - uses: actions/upload-artifact@v3
