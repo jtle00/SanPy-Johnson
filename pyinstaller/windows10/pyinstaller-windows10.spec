@@ -8,7 +8,7 @@ a = Analysis(
     ['..\\..\\sanpy\\interface\\sanpy_app.py'],
     pathex=[],
     binaries=[],
-    datas=[('libblosc2.dll', 'tables')
+    datas=[('libblosc2.dll', 'tables'),
         ('..\\..\\sanpy\\_userFiles','_userFiles')],
     hiddenimports=['tables', 'pkg_resources'],
     hookspath=[],
