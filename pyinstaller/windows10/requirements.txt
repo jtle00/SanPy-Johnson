@@ -1,7 +1,7 @@
 #python==3.9
-pyinstaller==5.2
+#pyinstaller==5.2
 #pyqtgraph==0.13.1
-PyQt5==5.15.4
+#PyQt5==5.15.4
 
 numpy
 pandas #pandas==1.5
@@ -18,9 +18,9 @@ h5py
 qtpy
 pyqtgraph
 pyqtdarktheme
-#PyQt5
+PyQt5
 #pywin32
 tornado
 windows-curses
-#pyinstaller
+pyinstaller
 
