@@ -6,7 +6,7 @@ block_cipher = None
 
 a = Analysis(
     ['..\\..\\sanpy\\interface\\sanpy_app.py'],
-    pathex=['C:\\Users\\johns\\miniconda3\\envs\\sanpy-env-pyinstaller\\Lib\\site-packages\\'],
+    pathex=[],
     binaries=[],
     datas=[('..\\..\\sanpy\\_userFiles','_userFiles')],
     hiddenimports=['tables', 'pkg_resources'],
