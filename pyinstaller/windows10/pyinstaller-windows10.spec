@@ -41,6 +41,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico',
+    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.icns',
 )
 
