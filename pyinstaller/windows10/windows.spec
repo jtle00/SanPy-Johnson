@@ -3,7 +3,6 @@
 
 block_cipher = None
 
-
 a = Analysis(
     ['..\\..\\sanpy\\interface\\sanpy_app.py'],
     pathex=['C:\\Users\\johns\\miniconda3\\envs\\sanpy-env-dev\\Lib\\site-packages\\'],
