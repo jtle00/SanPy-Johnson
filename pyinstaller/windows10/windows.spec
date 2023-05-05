@@ -5,9 +5,9 @@ block_cipher = None
 
 a = Analysis(
     ['..\\..\\sanpy\\interface\\sanpy_app.py'],
-    pathex=['C:\\Users\\johns\\miniconda3\\envs\\sanpy-env-dev\\Lib\\site-packages\\'],
+    pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\johns\\miniconda3\\envs\\sanpy-env-dev\\Lib\\site-packages\\tables\\libblosc2.dll', 'tables'),
+    datas=[('libblosc2.dll', 'tables'),
         ('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.png', '.'),
         #('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico', '.'),
         ('..\\..\\sanpy\\_userFiles','_userFiles')],
