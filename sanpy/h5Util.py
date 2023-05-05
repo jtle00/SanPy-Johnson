@@ -6,14 +6,12 @@ import shutil
 
 import pandas as pd
 
+# april 5, removed (why did I remove???)
 import tables.scripts.ptrepack  # to save compressed .h5 file
 
-# import logging
-# logging.getLogger('numexpr').setLevel(logging.WARNING)
 from sanpy.sanpyLogger import get_logger
 
 logger = get_logger(__name__)
-
 
 def listKeys(hdfPath, printData=False):
     """List all keys in h5 file."""

@@ -1,52 +1,15 @@
 
 
-## macOS Releases
+## Download the SanPy desktop application.
 
-For now, March-April 2023, once you download the dmg and copy to your Applicaitions/ folder, you will have to do the following in the terminal to actually run SanPy
+[Download macOS x86 ](https://github.com/cudmore/SanPy/releases/download/v0.1.9/SanPy-macOS-x86.zip){ .md-button .md-button--primary}
+[Download Windows](https://github.com/cudmore/SanPy/releases/download/v0.1.9/SanPy-windows.zip){ .md-button .md-button--accent }
 
-```
-xattr -cr /Applications/SanPy-Monterey.app
-```
+## Current Version
+ - Version 0.1.8
+ - Released on May 2, 2023
 
-<table>
-<tr>
-    <th>
-    Release Date
-    </th>
-    <th>
-    Operating System
-    </th>
-    <th>
-    Download
-    </th>
-    <th>
-    Release Notes
-    </th>
-</tr>
+## Current and previous releases (on GitHub)
 
-<tr>
+[Go To Current Release](https://github.com/cudmore/SanPy/releases/tag/v0.1.9){ .md-button .md-button--primary }
 
-    <td>
-    March 30, 2023
-    </td>
-
-    <td>
-    macOS Monterey
-    </td>
-
-    <td>
-    <A HREF="https://github.com/cudmore/SanPy/releases/download/v0.1-alpha.2/SanPy-Monterey.dmg">Download</>
-    </td>
-
-    <td>
-    <A HREF="https://github.com/cudmore/SanPy/releases/tag/v0.1-alpha.2">link</A>
-    </td>
-
-</tr>
-</table>
-
-## Windows Releases
-
-**Comin Soon**
-
-See all releases on the SanPy GitHub [release](https://github.com/cudmore/SanPy/releases) page.
