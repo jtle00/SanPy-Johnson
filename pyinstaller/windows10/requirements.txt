@@ -23,5 +23,5 @@ PyQt5
 tornado
 urllib3==1.26.15
 windows-curses
-pyinstaller
+pyinstaller==5.9.0 
 
