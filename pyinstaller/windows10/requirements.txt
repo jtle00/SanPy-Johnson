@@ -21,6 +21,7 @@ pyqtdarktheme
 PyQt5
 #pywin32
 tornado
+urllib3==1.26.15
 windows-curses
 pyinstaller
 
