@@ -13,6 +13,7 @@ from typing import Union, Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
+import scipy
 import scipy.signal
 import scipy.stats
 
@@ -174,7 +175,7 @@ class bAnalysis:
         """
 
         # get default derivative
-        if loadData:
+        if loadData and not self.loadError:
             self._rebuildFiltered()
 
         self._detectionDirty = False

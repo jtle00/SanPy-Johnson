@@ -2,37 +2,52 @@ SanPy is designed to run on: macOS, Microsoft Windows, and Linux.
 
 ## Download the SanPy app.
 
-We are building SanPy desktop applications so users can download a single file and get working with just a double-click. This does not require anything special on our users end. **No programming, no installing Python, and no command line**.
+We are building SanPy desktop applications so users can download a single file and get working with just a double-click. This does not require anything special on our users end. **No programming, no installing Python, and no command line**. See our [download](../download) page.
 
-See our [Download](download) page.
+## Install from the command line
 
-## Install from PyPi
+Create and activate a virtual environment with either `conda` or `venv`.
 
-Both the SanPy backend and front-end GUI can be installed from PyPi.
+!!! Important
 
-## Install the front-end GUI
+    M1/2 Mac users need to use a [Conda][mini-conda] environment as the arm64 versions of a number of Python packages are not available on PyPi (e.g. with pip install).
 
-```
-pip install sanpy-ephys[gui]
-```
+[mini-conda]: https://docs.conda.io/en/latest/miniconda.html
 
-On newer macOS machines or from a zsh shell in general, you need some quotes
+### Either create a `conda` environment
+
+    conda create -y -n sanpy-env python=3.9
+    conda activate sanpy-env
+
+### Or create a `venv` environment
+
+    python -m venv sanpy-env
+    
+    # macOS activate the environment
+    source sanpy-env/bin/activate
+
+    # Windows activate the environment
+    sanpy-env\Scripts\activate
+
+### Install SanPy from [PyPi](https://pypi.org/project/sanpy-ephys/)
+
+!!! Important
+
+    The SanPy package is named `sanpy-ephys`.
 
 ```
 pip install "sanpy-ephys[gui]"
 ```
 
-### Install the SanPy backend
+### Run the GUI
 
-This is designed to work as an engine to allow interoperability with other Python packages and to run in the cloud.
-
-```
-pip install sanpy-ephys
-```
+    sanpy
 
 ## Install from a local source
 
 For users interested in modifying the source code, you can clone the GitHub repository and install from local source.
+
+Be sure to create and activate a virtual environment (See above).
 
 Assuming you have the following
 
@@ -46,43 +61,15 @@ Assuming you have the following
 
 1) Clone the repository
 
-```
-git clone git@github.com:cudmore/SanPy.git
-cd SanPy
-```
+    git clone https://github.com/cudmore/SanPy.git
 
-2) Create and activate a virtual environment with either `conda` or `venv`
+2) Install SanPy
 
-2.1) With `conda`
-
-```
-conda create -y -n sanpy-env python=3.9
-conda activate sanpy-env
-```
-
-2.2) With `venv`
-
-```
-python -m venv sanpy-env
-source sanpy-env/bin/activate
-```
-
-3) Install SanPy including the desktop GUI
-
-```
-pip install -e .[gui]
-```
-
-Note, on newer macOS machines or if using the zsh shell in general, you need some extra quotes
-
-```
-pip install -e ".[gui]"
-```
+    cd SanPy
+    pip install -e ".[gui]"
 
 4) Run `sanpy`
 
-```
-sanpy
-```
+    sanpy
 
 5) Have fun
