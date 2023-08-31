@@ -12,6 +12,12 @@ jobs:
     runs-on: windows-latest
     
     steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4 
+      with:
+        python-version: 'pypy3.9' 
+    - run: python windows_script.py
+
     - name: Create Executable
       uses: sayyid5416/pyinstaller@v1
       with:
