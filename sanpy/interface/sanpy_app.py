@@ -768,13 +768,12 @@ class SanPyWindow(QtWidgets.QMainWindow):
         # x86_64
 
         # from sanpy.version import __version__
-        try:
-            from _version import __version__
-        except(ModuleNotFoundError) as e:
-            logger.info(f'error is: {e}')
-        else:
-            __version__ = "not found"
-
+        # try:
+        #     from _version import __version__
+        # except(ModuleNotFoundError) as e:
+        #     logger.info(f'error is: {e}')
+        #     __version__ = "not found"
+           
         # retDict['SanPy version'] = __version__
         # retDict['SanPy version'] = sanpy.__version__
         retDict['SanPy version'] = __version__
