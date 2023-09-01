@@ -9,11 +9,18 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v3
-        
+    
+    - uses: actions/setup-python@v4 
+      with:
+        python-version: '3.9' 
+    - name: Install dependencies
+      run: |
+        pip install -e '.[gui]'
+
     - name: Package Application
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
