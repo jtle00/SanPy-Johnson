@@ -22,11 +22,11 @@ jobs:
         pip install -e '.[gui]'
 
     - name: Package Application
-      uses: JackMcKew/pyinstaller-action-windows@main
+      uses: JackMcKew/pyinstaller-action-windows@python3-10-pyinstaller-5-3
       with:
         path: pyinstaller/windows10
 
     - uses: actions/upload-artifact@v3
       with:
-        name: name-of-artifact
+        name: sanpy-exe
         path: pyinstaller/windows10/dist
