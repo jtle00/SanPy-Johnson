@@ -775,8 +775,8 @@ class SanPyWindow(QtWidgets.QMainWindow):
         #     __version__ = "not found"
            
         # retDict['SanPy version'] = __version__
-        # retDict['SanPy version'] = sanpy.__version__
-        retDict['SanPy version'] = __version__
+        retDict['SanPy version'] = sanpy.__version__
+        # retDict['SanPy version'] = __version__
         retDict['Python version'] = platform.python_version()
         retDict['Python platform'] = _platform  # platform.platform()
         retDict['PyQt version'] = QtCore.__version__  # when using import qtpy
