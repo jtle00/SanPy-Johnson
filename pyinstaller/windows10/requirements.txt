@@ -24,4 +24,5 @@ tornado
 urllib3==1.26.15
 windows-curses
 pyinstaller==5.9.0 
+'.[gui]'
 
