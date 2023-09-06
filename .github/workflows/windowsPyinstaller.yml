@@ -1,4 +1,4 @@
-name: Versatile Pyinstaller Windows Build
+name: Windows Pyinstaller Windows Build
 
 on:
   push:
