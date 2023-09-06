@@ -21,7 +21,7 @@ jobs:
     #     pip install -e '.[gui]'
 
     - name: Create Executable
-      uses: sayyid5416/pyinstaller@v1
+      uses: jtle00/pyinstaller@v1
       with:
         python_ver: '3.9'
         spec: 'pyinstaller/windows10/windows.spec'
