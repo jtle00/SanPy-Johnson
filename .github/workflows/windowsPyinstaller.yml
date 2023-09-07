@@ -1,10 +1,10 @@
-name: Windows Pyinstaller Windows Build
+name: Windows Pyinstaller Exe Build
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: 
+  workflow_run:
+    workflows: ["Test with flake8 and pytest (cudmore)"]
+    types: [completed]
+    branches: [main]
 
 jobs:
   build:
@@ -12,13 +12,6 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    # - uses: actions/checkout@v3
-    # - uses: actions/setup-python@v4 
-    #   with:
-    #     python-version: '3.9' 
-    # - name: Install dependencies
-    #   run: |
-    #     pip install -e '.[gui]'
 
     - name: Create Executable
       uses: jtle00/pyinstaller@v1
