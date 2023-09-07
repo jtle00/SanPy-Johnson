@@ -16,12 +16,12 @@ on:
         - warning
         - debug
   # push:
-      tags:
-        - 'v*'
-  workflow_run:
-    workflows: ["Test"]
-    types: [completed]
-    branches: [main]
+  #     tags:
+  #       - 'v*'
+  # workflow_run:
+  #   workflows: ["Test"]
+  #   types: [completed]
+  #   branches: [main]
 
 jobs:
 
