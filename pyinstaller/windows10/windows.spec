@@ -8,8 +8,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('libblosc2.dll', 'tables'),
-        ('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.png', '.'),
-        #('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico', '.'),
+        ('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.png', '.'), # window icon
+        #('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico', '.'), 
         ('..\\..\\sanpy\\_userFiles','_userFiles')],
     hiddenimports=['tables', 'pkg_resources'],
     hookspath=[],
@@ -43,5 +43,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico',
+    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico', # Desktop Icon
 )
