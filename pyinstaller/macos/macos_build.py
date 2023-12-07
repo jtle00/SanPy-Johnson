@@ -54,7 +54,7 @@ def buildWithPyInstaller(output_dir : str,
 
 
     logger.info(f'  pyinstaller is getting paths[] site_packages from site.getsitepackages() ')
-    paths = site.getsitepackages()  # returns a list of path to the current python interpreter
+    # paths = site.getsitepackages()  # returns a list of path to the current python interpreter
     logger.info(f'    {site.getsitepackages()}')
 
     subprocess.run(
@@ -194,13 +194,16 @@ def _codesign_app_binary(entitlements: str,
         ],
     )
 
-def _codesign_app_arm(entitlements: str,
+def _old_codesign_app_arm(entitlements: str,
                        app_certificate: str,
                        output_dir: str,
                        app_name: str) -> None:
     """Codesign all *.dylib *.so in app bundle
 
     This is for arm
+
+    May 2023, not used
+
     """
     logger.info('===')
     
@@ -326,7 +329,7 @@ def _codesign_verify(output_dir: str, app_name: str) -> None:
     """
     # codesign --verify --verbose dist_x86/SanPy.app
     app_path = os.path.join(output_dir, f"{app_name}.app")
-    logger.info(f'=== codesign verify {app_path} ...')
+    logger.info(f'=== calling codesign verify {app_path} ...')
     subprocess.run(
         ["codesign", "--verify", "--verbose", app_path],
     )
@@ -403,10 +406,14 @@ def run_signing_commands(provisioning_profile,
         _codesign_app_deep(entitlements, app_certificate, output_dir, app_name)
 
     # codesign each .dylib in Resources/ (does not do --deep)
-    _codesign_app_resources(entitlements, app_certificate, output_dir, app_name)
+    # removed 20231123
+    if 1:
+        _codesign_app_resources(entitlements, app_certificate, output_dir, app_name)
     
     # resign one file (does not do deep)
-    _codesign_app_binary(entitlements, app_certificate, output_dir, app_name)
+    # removed 20231123
+    if 1:
+        _codesign_app_binary(entitlements, app_certificate, output_dir, app_name)
 
     if 0 and shortPlatformStr == 'intel':
         # this works for x86, might break arm64 ?
@@ -420,7 +427,7 @@ def run_signing_commands(provisioning_profile,
     # turned off for good arm build?
     if 0 and shortPlatformStr == 'arm':
         _codesign_app_resources(entitlements, app_certificate, output_dir, app_name)
-        #_codesign_app_arm(entitlements, app_certificate, output_dir, app_name)
+        #_old__codesign_app_arm(entitlements, app_certificate, output_dir, app_name)
         _codesign_app_binary(entitlements, app_certificate, output_dir, app_name)
 
     _codesign_verify(output_dir, app_name)  # verify the app we just signed

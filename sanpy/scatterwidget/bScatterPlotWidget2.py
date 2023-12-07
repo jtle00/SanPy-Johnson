@@ -45,6 +45,8 @@ import seaborn as sns
 # import sanpy
 # import bUtil # from sanpy folder, for pandas model
 
+from sanpy.sanpyLogger import get_logger
+logger = get_logger(__name__)
 
 def old_loadDatabase(path):
     """
@@ -1512,8 +1514,13 @@ class bScatterPlotMainWindow(QtWidgets.QMainWindow):
                 dfCopy = self.yDf.copy()
             else:
                 # append row then yDf
-                dfCopy.append(pd.Series(), ignore_index=True)
-                dfCopy.append(self.yDf, ignore_index=True)
+                logger.warning(f"need to replace append with concat")
+                # dfCopy.append(pd.Series(), ignore_index=True)
+                # dfCopy.append(self.yDf, ignore_index=True)
+    
+                dfCopy = pd.concat([dfCopy, pd.Series()])  # blank line
+                dfCopy = pd.concat([dfCopy, self.yDf])
+
             # self.yDf.to_clipboard(sep='\t', index=False)
             # print('Copied to clipboard')
             # print(self.yDf)
@@ -1967,7 +1974,7 @@ class bScatterPlotMainWindow(QtWidgets.QMainWindow):
         for i, analysisname in enumerate(fileNameList):
             tmpDf = self.masterDf[self.masterDf[self.groupByColumnName] == analysisname]
             if len(tmpDf) == 0:
-                print("  ERROR: got 0 length for analysisname:", analysisname)
+                logger.error(f'got 0 length for analysisname: {analysisname}')
                 continue
             # need to limit this to pre-defined catecorical columns
             for catName in self.masterCatColumns:
@@ -1996,9 +2003,7 @@ class bScatterPlotMainWindow(QtWidgets.QMainWindow):
                         self.yDf.loc[theseRows, catName] = catValue
                     # print('catName:', catName, 'catValue:', type(catValue), catValue)
                 else:
-                    print(
-                        "warning catName:", catName, "has", numUnique, "unique values"
-                    )
+                    logger.warning(f"catName: {catName} has {numUnique} unique values")
                     pass
                     # print(f'not adding {catName} to table, numUnique: {numUnique}')
         #

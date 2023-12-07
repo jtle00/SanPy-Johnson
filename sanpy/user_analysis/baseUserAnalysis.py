@@ -4,9 +4,11 @@ import importlib
 # import inspect
 import os
 import traceback  # to print call stack on exception
+import inspect
 from typing import List, Union
 
 import sanpy
+from sanpy import DO_KYMOGRAPH_ANALYSIS
 
 from sanpy.sanpyLogger import get_logger
 
@@ -34,7 +36,7 @@ def _module_from_file(module_name, file_path):
     return module
 
 
-def _getObjectList(verbose=False) -> List[dict]:
+def _getObjectList(verbose=True) -> List[dict]:
     """Return a list of classes defined in sanpy.userAnalysis.
 
     Each of these is an object we can (i) construct or (ii) interrogate statis class members
@@ -44,11 +46,9 @@ def _getObjectList(verbose=False) -> List[dict]:
     list of dict
     """
 
-    verbose = False
-
     if verbose:
         logger.info("")
-
+  
     #
     # user plugins from files in folder <user>/SanPy/analysis
     userAnalysisFolder = sanpy._util._getUserAnalysisFolder()
@@ -61,6 +61,9 @@ def _getObjectList(verbose=False) -> List[dict]:
         if file.endswith("__init__.py"):
             continue
 
+        if file == 'baseUserAnalysis.py':
+            continue
+
         moduleName = os.path.split(file)[1]
         moduleName = os.path.splitext(moduleName)[0]
         fullModuleName = "sanpy.user_analysis." + moduleName  # + "." + moduleName
@@ -69,10 +72,10 @@ def _getObjectList(verbose=False) -> List[dict]:
 
         if verbose:
             logger.info("")
-            logger.info(f"    file: {file}")
-            logger.info(f"    fullModuleName: {fullModuleName}")
-            logger.info(f"    moduleName: {moduleName}")
-            logger.info(f"    loadedModule: {loadedModule}")
+            logger.info(f"   file: {file}")
+            logger.info(f"   fullModuleName: {fullModuleName}")
+            logger.info(f"   moduleName: {moduleName}")
+            logger.info(f"   loadedModule: {loadedModule}")
 
         # class based user analysis
         oneConstructor = None
@@ -85,7 +88,7 @@ def _getObjectList(verbose=False) -> List[dict]:
                 logger.info(f"    type(oneConstructor): {type(oneConstructor)}")
         except AttributeError as e:
             logger.error(
-                f'Make sure filename and class name are the same,  file name is "{moduleName}"'
+                f'Make sure filename and class name are the same, file name is "{moduleName}"'
             )
 
         # instantiate the object and it will create a dictionary of new stats
@@ -103,10 +106,41 @@ def _getObjectList(verbose=False) -> List[dict]:
         }
 
         if verbose:
-            logger.info(f'loading user analysis from file: "{file}"')
+            logger.info(f'  loading user analysis from file: "{file}"')
 
         loadedModuleList.append(pluginDict)
 
+    # new, june 2023, get from user_analysis folder as well
+    logger.info('fetching user analysis from core code folder sanpy.user_analysis')
+    _ignoreModuleList = []
+    if not DO_KYMOGRAPH_ANALYSIS:
+        _ignoreModuleList.append('kymUserAnalysis')
+    for moduleName, obj in inspect.getmembers(sanpy.user_analysis):
+        if moduleName in _ignoreModuleList:
+            continue
+        if inspect.isclass(obj):
+            # print('moduleName:', moduleName, 'obj:', obj)
+            # moduleName: kymUserAnalysis obj: <class 'sanpy.user_analysis.userKymDiamAnalysis.kymUserAnalysis'>
+            fullModuleName = "sanpy.user_analysis." + moduleName
+
+            # instantiate the object and it will create a dictionary of new stats
+            _tmpObj = obj(ba=None)
+            _statStatDict = _tmpObj._getUserStatDict()
+
+            pluginDict = {
+                "pluginClass": moduleName,
+                "type": "user_analysis",
+                "module": fullModuleName,
+                "path": 'not_used',
+                "constructor": obj,
+                "staticStatDict": _statStatDict,
+            }
+
+            if verbose:
+                logger.info(f' loading core user analysis from user_analysis: "{moduleName}"')
+
+            loadedModuleList.append(pluginDict)
+          
     # print out the entire list
     # logger.info('')
     # for loadedModuleDict in loadedModuleList:
@@ -117,7 +151,10 @@ def _getObjectList(verbose=False) -> List[dict]:
 
 
 def findUserAnalysisStats() -> List[dict]:
-    """Get the stat names of all user defined analysis."""
+    """Get the stat names of all user defined analysis.
+    
+    This is determined once at runtime. If files change, sanpy must be restarted.
+    """
     userStatList: List[dict] = []
     objList = _getObjectList()  # list of dict
     for obj in objList:
@@ -134,7 +171,6 @@ def findUserAnalysisStats() -> List[dict]:
             userStatList.append(oneUserStatDict)
 
     return userStatList
-
 
 def runAllUserAnalysis(ba, verbose=False):
     """Run all user defined analysis.
@@ -216,7 +252,7 @@ class baseUserAnalysis:
         }
         """
         if humanName in self._userStatDict.keys():
-            logger.error(f'User stat with human name "{humanName}" already exists')
+            # logger.error(f'User stat with human name "{humanName}" already exists')
             return
         statDict = {
             "name": internalName,
@@ -270,9 +306,9 @@ class baseUserAnalysis:
         """
         try:
             self.ba.spikeDict[spikeIdx][theKey] = theVal
-        except KeyError as e:
+        except (KeyError) as e:
             logger.error(f'User internal stat does not exist "{theKey}"')
-        except IndexError as e:
+        except (IndexError) as e:
             logger.error(
                 f"spikeIdx {spikeIdx} is out of range, max value is {self.ba.numSpikes}"
             )
@@ -310,5 +346,6 @@ class baseUserAnalysis:
 
 if __name__ == "__main__":
     # test1()
-    # _getObjectList()
-    findUserAnalysisStats()
+    _getObjectList(verbose=True)
+    
+    #findUserAnalysisStats()

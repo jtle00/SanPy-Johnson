@@ -48,6 +48,11 @@ class bPlugins:
         """Get the underlying SanPy app."""
         return self._sanpyApp
 
+    def getStatList(self):
+        if self._sanpyApp is None:
+            return
+        return self._sanpyApp.getStatList()
+    
     def loadPlugins(self):
         """Load plugins from both:
          - Package: sanpy.interface.plugins
@@ -67,6 +72,9 @@ class bPlugins:
             "NavigationToolbar2QT",
             "myStatListWidget",
         ]
+
+        if not sanpy.DO_KYMOGRAPH_ANALYSIS:
+            ignoreModuleList.append('kymographPlugin')
 
         #
         # system plugins from sanpy.interface.plugins
@@ -100,9 +108,9 @@ class bPlugins:
                     self.pluginDict[humanName] = pluginDict
 
         # print the loaded plugins
-        logger.info(f"Loaded plugins:")
+        logger.info('Loaded plugins:')
         for loaded in loadedList:
-            logger.info(f"    {loaded}")
+            logger.info(f'    {loaded}')
         # sort
         self.pluginDict = dict(sorted(self.pluginDict.items()))
 
@@ -217,8 +225,13 @@ class bPlugins:
                             _pluginDict["h"],
                         )
                     newPlugin.getWidget().show()
+                    newPlugin.getWidget().setVisible(True)
                     # newPlugin.getWidget().raise_()  # bring to front, raise is a python keyword
                     # newPlugin.getWidget().activateWindow()  # bring to front
+
+                else:
+                    newPlugin.getWidget().hide()
+                    newPlugin.getWidget().setVisible(False)
 
                 # add the plugin to open next time we run
 

@@ -1,6 +1,10 @@
 # Author: Robert H Cudmore
 # Date: 20190719
 
+# see: https://stackoverflow.com/questions/63871662/python-multiprocessing-freeze-support-error
+from multiprocessing import freeze_support
+freeze_support()
+
 #from curses.panel import bottom_panel
 import os, sys
 
@@ -100,8 +104,11 @@ class SanPyWindow(QtWidgets.QMainWindow):
         if firstTimeRunning:
             logger.info("  We created <user>/Documents/Sanpy and need to restart")
 
-        self._fileLoaderDict = sanpy.fileloaders.getFileLoaders()
-        self._detectionClass = sanpy.bDetection()
+        self._fileLoaderDict = sanpy.fileloaders.getFileLoaders(verbose=True)
+        
+        self._detectionClass : sanpy.bDetection = sanpy.bDetection()
+
+        self._analysisUtil = sanpy.bAnalysisUtil()
 
         # create an empty model for file list
         dfEmpty = pd.DataFrame(columns=sanpy.analysisDir.sanpyColumns.keys())
@@ -130,7 +137,7 @@ class SanPyWindow(QtWidgets.QMainWindow):
         self._rowHeight = 11
 
         # path to loaded folder (using bAnalysisDir)
-        self.configDict: sanpy.interface.preferences = sanpy.interface.preferences(self)
+        self.configDict : sanpy.interface.preferences = sanpy.interface.preferences(self)
         self.myAnalysisDir = None
         lastPath = self.configDict.getMostRecentFolder()
         logger.info(f'  preferences lastPath is "{lastPath}"')
@@ -172,7 +179,10 @@ class SanPyWindow(QtWidgets.QMainWindow):
         self.slot_updateStatus("Ready")
         logger.info("SanPy started")
 
-    def getDetectionClass(self):
+    def getStatList(self):
+        return self._analysisUtil.getStatList()
+    
+    def getDetectionClass(self) -> "sanpy.bDetection":
         return self._detectionClass
 
     def getFileLoaderDict(self):
@@ -316,6 +326,9 @@ class SanPyWindow(QtWidgets.QMainWindow):
 
             # self.configDict.save()
 
+    def slot_folderDepth(self, folderDepth : int):
+        self.configDict['fileList']['Folder Depth'] = folderDepth
+        
     def slot_loadFolder(self, path="", folderDepth=None):
         """Load a folder of raw data files.
 
@@ -454,6 +467,7 @@ class SanPyWindow(QtWidgets.QMainWindow):
             else:
                 self.stopSec = None
             logger.info(f'"-->> emit signalSetXAxis set full x axis" {self.startSec} {self.stopSec}')
+            # plugins are connected to this
             self.signalSetXAxis.emit(
                 [self.startSec, self.stopSec]
             )  # emits to scatter plot ONLY
@@ -561,8 +575,13 @@ class SanPyWindow(QtWidgets.QMainWindow):
                 if selectingAgain:
                     pass
                 else:
+                    fileNote = ba.metaData.getMetaData('Note')
+                    if fileNote:
+                        fileNote = 'Note:' + fileNote
+                    else:
+                        fileNote = ''
                     self.slot_updateStatus(
-                        f'Loaded file "{ba.fileLoader.filename}"'
+                        f'Loaded file {ba.fileLoader.filename} {fileNote}'
                     )  # this will load ba if necc
 
     def _buildMenus(self):
@@ -873,6 +892,14 @@ class SanPyWindow(QtWidgets.QMainWindow):
         action.setEnabled(checkedMainPanel)
         self.viewMenu.addAction(action)
 
+        name = "Set Meta Data"
+        checked = self.configDict["detectionPanels"][name]
+        action = QtWidgets.QAction(name, self, checkable=True)
+        action.setChecked(checked)
+        action.triggered.connect(partial(self._viewMenuAction, key1, name))
+        action.setEnabled(checkedMainPanel)
+        self.viewMenu.addAction(action)
+
         name = "Plot Options"
         checked = self.configDict["detectionPanels"][name]
         action = QtWidgets.QAction(name, self, checkable=True)
@@ -1052,9 +1079,11 @@ class SanPyWindow(QtWidgets.QMainWindow):
 
         #
         # list of files (in a dock)
-        self._fileListWidget = sanpy.interface.fileListWidget(self.myModel)
-        # self._fileListWidget.signalUpdateStatus.connect(self.slot_updateStatus)  # never used
+        folderDepth = self.configDict["fileList"]["Folder Depth"]
+        self._fileListWidget = sanpy.interface.fileListWidget(self.myModel, folderDepth=folderDepth)
+        self._fileListWidget._tableView.signalUpdateStatus.connect(self.slot_updateStatus)  # 
         self._fileListWidget.signalLoadFolder.connect(self.slot_loadFolder)
+        self._fileListWidget.signalSetFolderDepth.connect(self.slot_folderDepth)
         self._fileListWidget.getTableView().signalSelectRow.connect(
             self.slot_fileTableClicked
         )
@@ -1201,6 +1230,8 @@ class SanPyWindow(QtWidgets.QMainWindow):
                 _runningPlugin.getHumanName(), externalWindow=True, ltwhTuple=ltwhTuple
             )
 
+        return _runningPlugin
+    
     def slot_updateAnalysis(self, sDict : dict):
         """Respond to both detect and user setting columns in ba.
         
@@ -1484,6 +1515,9 @@ def main():
 
     Configured in setup.py
     """
+    # logger.info('calling freeze support')
+    # freeze_support()
+
     logger.info(f"Starting sanpy_app.py in main()")
     # date_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # logger.info(f'    {date_time_str}')

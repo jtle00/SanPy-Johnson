@@ -1,4 +1,5 @@
 import os
+import sys
 import math
 import time
 import datetime
@@ -24,12 +25,15 @@ import sanpy.bDetection
 import sanpy.user_analysis.baseUserAnalysis  # to stop circular imports
 import sanpy.h5Util
 import sanpy.fileloaders
+import sanpy.bAnalysisResults
+import sanpy._util
+
 from sanpy.fileloaders import recordingModes
 
+# from metaData import MetaData
+
 from sanpy.sanpyLogger import get_logger
-
 logger = get_logger(__name__)
-
 
 class bAnalysis:
     """
@@ -84,6 +88,10 @@ class bAnalysis:
         """str: File path."""
 
         self._detectionDict: dict = None  # corresponds to an item in sanpy.bDetection
+
+        # sept 9, moving this to file loader
+        # fileloader holds meta data
+        #self._metaData = MetaData(self)  #self.getMetaDataDict()
 
         self._isAnalyzed: bool = False
 
@@ -154,6 +162,22 @@ class bAnalysis:
             except KeyError as e:
                 logger.error(f'did not find a file loader for extension "{_ext}"')
                 self.loadError = True
+            
+            self._kymAnalysis : sanpy.kymAnalysis = None
+            if (self.fileLoader is not None) and (self.fileLoader.recordingMode == recordingModes.kymograph):
+                if verbose:
+                    logger.info('creating kymAnalysis')
+                    logger.info(f'    self.fileLoader.filepath:{self.fileLoader.filepath}')
+                    logger.info(f'    self.fileLoader.tifData:{self.fileLoader.tifData.shape}')
+                    logger.info(f'    self.fileLoader.tifHeader:{self.fileLoader.tifHeader}')
+                self._kymAnalysis = sanpy.kymAnalysis(self.fileLoader.filepath,
+                                                      self.fileLoader.tifData,
+                                                      self.fileLoader.tifHeader)
+
+            if self._fileLoader is not None:
+                # we need to so file loader meta data can set ba (Self) dirty when changed
+                self.fileLoader.metadata._ba = self
+
 
         """
         if byteStream is not None:
@@ -185,7 +209,19 @@ class bAnalysis:
         """
 
     @property
-    def fileLoader(self):
+    def metaData(self):
+        # sept 9, moved to file loader
+        # return self._metaData
+        return self.fileLoader.metadata
+    
+    @property
+    def kymAnalysis(self):
+        """Get the kymAnalysis object (if it exists).
+        """
+        return self._kymAnalysis
+    
+    @property
+    def fileLoader(self) -> "sanpy.fileLoader_base":
         """ """
         return self._fileLoader
 
@@ -196,7 +232,7 @@ class bAnalysis:
         """Return analysis as a Pandas DataFrame.
 
         Important:
-            This returns a COPY !!!
+            This is a df copy of our self.spikeDict
             Do not modify and expect changes to stick
         """
         return self._dfReportForScatter
@@ -220,21 +256,36 @@ class bAnalysis:
         return txt
 
     def _saveHdf_pytables(self, hdfPath):
-        """Save detection parameters and analysis into an hdf5 file."""
+        """Save detection parameters and analysis into an hdf5 file.
+        """
+
+        # save kym diameter analysis
+        if self._kymAnalysis is not None:
+            if self._kymAnalysis.hasDiamAnalysis() and self._kymAnalysis._analysisDirty:
+                self._kymAnalysis.saveAnalysis()
+
+
         if not self.detectionDirty:
             # Do not save it detection has not changed
             logger.info(f"NOT SAVING, is not dirty {self}")
             return False
 
+        # always save as csv
+        self.saveAnalysis_tocsv()
+
         # when making df from dict, need to pass it a list
         # o.w. key values that are lists get expanded into rows
-        dfDetection = pd.DataFrame([self._detectionDict])
+        if self._detectionDict is not None:
+            dfDetection = pd.DataFrame([self._detectionDict])
+
+        dfMetaData = pd.DataFrame([self.metaData])
 
         # convert spikeList (list of dict) to json
         # spikeList = self.spikeDict.asList()
         # dataJson = json.dumps(spikeList, cls=NumpyEncoder)  # list of dict
         # dfAnalysis = pd.DataFrame(spikeList)
-        dfAnalysis = self.spikeDict.asDataFrame()
+        if len(self.spikeDict) > 0:
+            dfAnalysis = self.spikeDict.asDataFrame()
 
         uuid = self.uuid
 
@@ -243,77 +294,170 @@ class bAnalysis:
         )
 
         with pd.HDFStore(hdfPath) as hdfStore:
-            key = uuid + "/" + "detectionDict"
-            dfDetection.to_hdf(hdfStore, key)  # default mode='a'
+            if self._detectionDict is not None:
+                key = uuid + "/" + "detectionDict"
+                dfDetection.to_hdf(hdfStore, key)  # default mode='a'
 
-            key = uuid + "/" + "analysisList"
-            dfAnalysis.to_hdf(hdfStore, key)
+            # always save meta data
+            key = uuid + "/" + "metaDataDict"
+            dfMetaData.to_hdf(hdfStore, key)  # default mode='a'
+            
+            # logger.warning('=== saving dfMetaData')
+            # print(dfMetaData)
+
+            if len(self.spikeDict) > 0:
+                key = uuid + "/" + "analysisList"
+                dfAnalysis.to_hdf(hdfStore, key)
 
         # we saved, detection is not dirty
         self._detectionDirty = False
 
         return True
 
-    def _loadHdf_pytables(self, hdfPath, uuid):
+    def _findUuid(self, hdfPath):
+        """Find this analysis uuid in an h5 file. If analysis is not saved, it will not exists.
+        """
+
+        # load the database
+        detectionDictKey = 'sanpy_recording_db'
+        dfDetection = pd.read_hdf(hdfPath, key=detectionDictKey)
+        
+        fileList = dfDetection['File'].to_list()
+        
+        filename = self.fileLoader.filename
+        try:
+            idx = fileList.index(filename)
+        except (ValueError) as e:
+            #logger.warning(f'did not find file {filename} in file list {fileList}')
+            return
+        
+        uuid = dfDetection['uuid'].to_list()[idx]
+
+        return uuid
+    
+    def _loadHdf_pytables(self, hdfPath, uuid = None):
         """Load analysis from an h5 file using key 'uuid'.
+
+        Parameters
+        ----------
+        hdfPath : str
+            path to h5 file
+        uuid : uuid
+            Unique uuid for the file, if None then will try and find the file in hdfPath
 
         Notes
         -----
-            df.to_dict() requires into=OrderedDIct, o.w. column order is sorted
-            Error report needs to be generated (is not in h5 file)
-                use getErrorReport()
+        If uuid is None, this only work for 'flat' directories,
+        the ba has to be in same folder as h5 file
         """
+
+        # df.to_dict() requires into=OrderedDict, o.w. column order is sorted
+        # Error report needs to be generated (is not in h5 file) use getErrorReport()
 
         # cant use pd.HDFStore(<path>) as read_hdf does not understand file pointer
 
-        logger.info(f"loading {uuid} from {hdfPath}")
+        if uuid is None:
+            uuid = self._findUuid(hdfPath)
+            if uuid is None:
+                logger.warning(f'did not find a uuid for {self.fileLoader.filename} in h5 file {hdfPath}')
+                logger.warning(f'this usually happens when the analysis was not saved')
+                return
+            
+        # logger.info(f"loading {uuid} from {hdfPath}")
 
         # load pandas dataframe(s) from h5 file
-        didLoad = True
+        loadedDetection = False
+        loadedMetaData = False
+        loadedAnalysis = False
         try:
             detectionDictKey = uuid + "/" + "detectionDict"  # group
             dfDetection = pd.read_hdf(hdfPath, detectionDictKey)
+            loadedDetection = True
         except KeyError as e:
-            logger.error(e)
-            didLoad = False
+            logger.error(f'detectionDict: {e}')
+            # didLoad = False
+            
+        try:
+            metaDataDictKey = uuid + "/" + "metaDataDict"  # group
+            dfMetaData = pd.read_hdf(hdfPath, metaDataDictKey)
+            loadedMetaData = True
+        except KeyError as e:
+            logger.error(f'metaDataDict: {e}')
+            # didLoad = False
+
         try:
             analysisListKey = uuid + "/" + "analysisList"
             dfAnalysis = pd.read_hdf(hdfPath, analysisListKey)
+            loadedAnalysis = True
         except KeyError as e:
-            logger.error(e)
-            didLoad = False
+            logger.error(f'analysisList: {e}')
+            # didLoad = False
 
-        if didLoad:
+        # if didLoad:
+        if 1:
             # we take on the uuid we were loaded from
             self.uuid = uuid
 
             # convert to a dict
-            detectionDict = dfDetection.to_dict("records", into=OrderedDict)[
-                0
-            ]  # one dict
+            if loadedDetection:
+                detectionDict = dfDetection.to_dict("records", into=OrderedDict)[
+                    0
+                ]  # one dict
+                self._detectionDict = detectionDict
 
-            self._detectionDict = detectionDict
-            # pprint(detectionDict)
+            if loadedMetaData:
+                # create a child MEtaData object
+                #logger.info('creating child MetaData')
+                #self.metaData = sanpy.MetaData(self)
+                #self.fileLoader.metadata = sanpy.MetaData()
+
+                #metaDataDict = self.metaData.getMetaDataDict()  # default
+                metaDataDict = sanpy.MetaData.getMetaDataDict()
+                
+                loadedMetaDataDict = dfMetaData.to_dict("records", into=OrderedDict)[
+                    0
+                ]  # one dict
+                # we need to load current meta data dict with all current keys
+                # saved file may be out of date
+
+                # bug during implementing meta data code
+                # if loadedMetaDataDict['sex'] == '':
+                #     loadedMetaDataDict['sex'] = 'unknown'
+
+                # logger.info('loadedMetaDataDict')
+                # logger.info(loadedMetaDataDict)
+
+                for k,v in loadedMetaDataDict.items():
+                    if not k in metaDataDict.keys():
+                        logger.error(f'  did not find loaded meta data key "{k}" in meta data keys {metaDataDict.keys()}')
+                        continue
+                    metaDataDict[k] = v
+                self.metaData.fromDict(metaDataDict, triggerDirty=False)
+
+                # logger.warning(f'LOADED META DATA:')
+                # print('self.metaData:', self.metaData)
 
             # convert to a list of dict
-            analysisList = dfAnalysis.to_dict(
-                "records", into=OrderedDict
-            )  # list of dict
-            self.spikeDict.setFromListDict(analysisList)
-            # pprint(analysisList[0])
+            if loadedAnalysis:
+                analysisList = dfAnalysis.to_dict(
+                    "records", into=OrderedDict
+                )  # list of dict
+                self.spikeDict.setFromListDict(analysisList)
+                # pprint(analysisList[0])
 
-            # recreate spike analysis dataframe
-            self._dfReportForScatter = dfAnalysis
+                # recreate spike analysis dataframe
+                # self._dfReportForScatter = dfAnalysis
+                self.regenerateAnalysisDataFrame()
 
-            # regenerate error report
-            self.dfError = self.getErrorReport()
+                # regenerate error report
+                self.dfError = self.getErrorReport()
 
-            # dec 2022
-            self._isAnalyzed = True
+                # dec 2022
+                self._isAnalyzed = True
 
-            logger.info(
-                f"    loaded {len(detectionDict.keys())} detection keys and {len(self.spikeDict)} spikes"
-            )
+            # logger.info(
+            #     f"    loaded {len(detectionDict.keys())} detection keys and {len(self.spikeDict)} spikes"
+            # )
         else:
             logger.error(f"    LOAD FAILED")
 
@@ -476,7 +620,7 @@ class bAnalysis:
         logger.info(f'Given {len(spikeList)} and set {count}')
         """
 
-    def getSweepStats(
+    def _old_getSweepStats(
         self, statName: str, decimals=3, asDataFrame=False, df: pd.DataFrame = None
     ):
         """
@@ -597,6 +741,7 @@ class bAnalysis:
             error = True
         elif statName1 not in self.spikeDict[0].keys():
             logger.error(f'Did not find statName1: "{statName1}" in spikeDict')
+            # print('available stat names are:', self.spikeDict[0].keys())
             error = True
         elif statName2 is not None and statName2 not in self.spikeDict[0].keys():
             logger.error(f'Did not find statName2: "{statName2}" in spikeDict')
@@ -630,13 +775,20 @@ class bAnalysis:
             else:
                 # only current sweep and epoch
                 # (1) was this
+                # was causing errors with kym diam analysis
                 x = [
                     clean(spike[statName1])
                     for spike in self.spikeDict
                     if (sweepNumber == "All" or spike["sweep"] == sweepNumber)
                     and (epochNumber == "All" or spike["epoch"] == epochNumber)
                 ]
-
+                # for _idx, spike in enumerate(self.spikeDict):
+                #     if (sweepNumber == "All" or spike["sweep"] == sweepNumber) and (epochNumber == "All" or spike["epoch"] == epochNumber):
+                #         try:
+                #             val = spike[statName1]
+                #         except (KeyError) as e:
+                #             logger.error(f'did not find key "{statName1}" at spike {_idx}')
+                #         clean(val)
 
             if statName2 is not None:
                 # original
@@ -1073,9 +1225,15 @@ class bAnalysis:
         goodSpikeTimes = []
         sweepY = self.fileLoader.sweepY
         for spikeTime in spikeTimes0:
-            peakVal = np.max(sweepY[spikeTime : spikeTime + peakWindow_pnts])
-            if peakVal > dDict["mvThreshold"]:
-                goodSpikeTimes.append(spikeTime)
+            # wu-lab-stanford data
+            try:
+                peakVal = np.max(sweepY[spikeTime : spikeTime + peakWindow_pnts])
+                if peakVal > dDict["mvThreshold"]:
+                    goodSpikeTimes.append(spikeTime)
+            except (ValueError) as e:
+                logger.error(e)
+                logger.error(f'   spikeTime:{spikeTime} peakWindow_pnts:{peakWindow_pnts}')
+                logger.error(f'   _dataPointsPerMs: {self.fileLoader._dataPointsPerMs}')
         spikeTimes0 = goodSpikeTimes
 
         #
@@ -1418,7 +1576,7 @@ class bAnalysis:
         #
         # small window to average Vm to calculate MDP (itself in a window before spike)
         avgWindow_pnts = self.fileLoader.ms2Pnt_(dDict["avgWindow_ms"])
-        avgWindow_pnts = math.floor(avgWindow_pnts / 2)
+        avgWindow_pnts = math.floor(avgWindow_pnts / 2)  # can be 0 !!!
 
         #
         # for each spike
@@ -1588,13 +1746,14 @@ class bAnalysis:
                 startPnt = 0
                 # log error
                 errorType = "Pre spike min under-run (mdp)"
-                errorStr = "Went past time 0 searching for pre-spike min"
+                errorStr = "Went past startPnt 0 searching for pre-spike min"
                 eDict = self._getErrorDict(
                     i, spikeTimes[i], errorType, errorStr
                 )  # spikeTime is in pnts
                 spikeDict[iIdx]["errors"].append(eDict)
                 if verbose:
-                    print(f"  spike:{iIdx} error:{eDict}")
+                    logger.error(f"  spike:{iIdx} error:{eDict}")
+                    logger.error(f'  going to index vmFiltered {startPnt} to spike time i {i} with value {spikeTimes[i]}')
 
             preRange = filteredVm[startPnt : spikeTimes[i]]  # EXCEPTION
             try:
@@ -1615,33 +1774,47 @@ class bAnalysis:
                 if verbose:
                     print(f"  spike:{iIdx} error:{eDict}")
             if preMinPnt is not None:
-                preMinPnt += startPnt
-                # the pre min is actually an average around the real minima
-                avgRange = filteredVm[
-                    preMinPnt - avgWindow_pnts : preMinPnt + avgWindow_pnts
-                ]
-                preMinVal = np.average(avgRange)
-
-                # search backward from spike to find when vm reaches preMinVal (avg)
-                preRange = filteredVm[preMinPnt : spikeTimes[i]]
-                preRange = np.flip(preRange)  # we want to search backwards from peak
-                try:
-                    preMinPnt2 = np.where(preRange < preMinVal)[0][0]
-                    preMinPnt = spikeTimes[i] - preMinPnt2
-                    spikeDict[iIdx]["preMinPnt"] = preMinPnt
-                    spikeDict[iIdx]["preMinVal"] = preMinVal
-
-                except IndexError as e:
-                    errorType = "Pre spike min (mdp)"
-                    errorStr = "Did not find preMinVal: " + str(
-                        round(preMinVal, 3)
-                    )  # + ' postRange min:' + str(np.min(postRange)) + ' max ' + str(np.max(postRange))
+                # 20230924, avgMinPnts is coming up zero now that we have sampling dt for kymographs that are slow !!!
+                if avgWindow_pnts < 1:
+                    # error
+                    errorType = "mdp error"
+                    errorStr = "avgWindow_pnts"
                     eDict = self._getErrorDict(
                         i, spikeTimes[i], errorType, errorStr
                     )  # spikeTime is in pnts
                     spikeDict[iIdx]["errors"].append(eDict)
                     if verbose:
                         print(f"  spike:{iIdx} error:{eDict}")
+                
+                else:
+                    preMinPnt += startPnt
+                    # the pre min is actually an average around the real minima
+                    avgRange = filteredVm[
+                        preMinPnt - avgWindow_pnts : preMinPnt + avgWindow_pnts
+                    ]
+                    # print('  avgRange is:' , avgRange)
+                    preMinVal = np.average(avgRange)
+
+                    # search backward from spike to find when vm reaches preMinVal (avg)
+                    preRange = filteredVm[preMinPnt : spikeTimes[i]]
+                    preRange = np.flip(preRange)  # we want to search backwards from peak
+                    try:
+                        preMinPnt2 = np.where(preRange < preMinVal)[0][0]
+                        preMinPnt = spikeTimes[i] - preMinPnt2
+                        spikeDict[iIdx]["preMinPnt"] = preMinPnt
+                        spikeDict[iIdx]["preMinVal"] = preMinVal
+
+                    except IndexError as e:
+                        errorType = "Pre spike min (mdp)"
+                        errorStr = "Did not find preMinVal: " + str(
+                            round(preMinVal, 3)
+                        )  # + ' postRange min:' + str(np.min(postRange)) + ' max ' + str(np.max(postRange))
+                        eDict = self._getErrorDict(
+                            i, spikeTimes[i], errorType, errorStr
+                        )  # spikeTime is in pnts
+                        spikeDict[iIdx]["errors"].append(eDict)
+                        if verbose:
+                            print(f"  spike:{iIdx} error:{eDict}")
 
             #
             # The nonlinear late diastolic depolarization phase was
@@ -1696,7 +1869,7 @@ class bAnalysis:
                         if verbose:
                             print(f"  spike:{iIdx} error:{eDict}")
 
-                except TypeError as e:
+                except (TypeError, RuntimeWarning) as e:
                     # catching exception:  expected non-empty vector for x
                     # xFit/yFit turn up empty when mdp and TOP points are within 1 point
                     spikeDict[iIdx]["earlyDiastolicDurationRate"] = defaultVal
@@ -1874,12 +2047,13 @@ class bAnalysis:
         # generate a df holding stats (used by scatterplotwidget)
         # startSeconds = dDict['startSeconds']
         # stopSeconds = dDict['stopSeconds']
-        if self.numSpikes > 0:
-            # exportObject = sanpy.bExport(self)
-            # self.dfReportForScatter = exportObject.report(startSeconds, stopSeconds)
-            self._dfReportForScatter = self.spikeDict.asDataFrame()
-        else:
-            self.dfReportForScatter = None
+        # if self.numSpikes > 0:
+        #     # exportObject = sanpy.bExport(self)
+        #     # self.dfReportForScatter = exportObject.report(startSeconds, stopSeconds)
+        #     self._dfReportForScatter = self.spikeDict.asDataFrame()
+        # else:
+        #     self.dfReportForScatter = None
+        self.regenerateAnalysisDataFrame()
 
         # generate error report
         self.dfError = self.getErrorReport()
@@ -1888,6 +2062,29 @@ class bAnalysis:
         self._detectionDirty = True
 
         ## done
+
+    def regenerateAnalysisDataFrame(self):
+        if self.numSpikes > 0:
+            # exportObject = sanpy.bExport(self)
+            # self.dfReportForScatter = exportObject.report(startSeconds, stopSeconds)
+            self._dfReportForScatter = self.spikeDict.asDataFrame()
+
+            # get rid of analysis results columns, we get these from file metadata
+            #  - include
+            #  - cellType
+            #  - sex
+            #  - condition
+            self._dfReportForScatter = self._dfReportForScatter.drop('include', axis=1)
+            self._dfReportForScatter = self._dfReportForScatter.drop('cellType', axis=1)
+            self._dfReportForScatter = self._dfReportForScatter.drop('sex', axis=1)
+            self._dfReportForScatter = self._dfReportForScatter.drop('condition', axis=1)
+
+            # add all file meta data to df
+            for k,v in self.metaData.items():
+                self._dfReportForScatter[k] = v
+
+        else:
+            self.dfReportForScatter = None
 
     def _getFeet(self, thresholdPnts: List[int], prePnts: int) -> List[int]:
         """
@@ -2250,7 +2447,7 @@ class bAnalysis:
         # numError = 0
         # errorList = []
 
-        logger.info(f'Generating error report for {len(self.spikeDict)} spikes')
+        # logger.info(f'Generating error report for {len(self.spikeDict)} spikes')
 
         #  20230422 spikeDict is not working as an iterable
         # use it as a list instead
@@ -2303,7 +2500,7 @@ class bAnalysis:
         be = sanpy.bExport(self)
         be.saveReport(savefile, saveExcel=saveExcel, alsoSaveTxt=alsoSaveTxt)
 
-    def _normalizeData(self, data):
+    def _old__normalizeData(self, data):
         """Calculate normalized data for detection from Kymograph. Is NOT for df/d0."""
         return (data - np.min(data)) / (np.max(data) - np.min(data))
 
@@ -2339,21 +2536,42 @@ class bAnalysis:
         self._detectionDirty = False
         self._isAnalyzed = True
 
-    def saveAnalysis_tocsv(self):
-        """Save analysis to csv."""
+    def saveAnalysis_tocsv(self, path : str = None, verbose=False):
+        """Save analysis to csv.
+        
+        CSV starts with one 
+        Parameters
+        ----------
+        path : str
+            Full path of file to save, if None will save as default.
+        """
+
+        if path is None:
+            saveFolder = self._getSaveFolder()
+            if not os.path.isdir(saveFolder):
+                if verbose:
+                    logger.info(f"making folder: {saveFolder}")
+                os.mkdir(saveFolder)
+
+            saveBase = self._getSaveBase()
+            path = saveBase + "-analysis.csv"
+
+        if verbose:
+            logger.info(f'saving to: {path}')
+
+        metaDataHeader = self.metaData.getHeader()
+
+        with open(path, "w") as f:
+            f.write(metaDataHeader)
+            f.write("\n")
+
         df = self.asDataFrame()  # pd.DataFrame(self.spikeDict)
-
-        saveFolder = self._getSaveFolder()
-        if not os.path.isdir(saveFolder):
-            logger.info(f"making folder: {saveFolder}")
-            os.mkdir(saveFolder)
-
-        saveBase = self._getSaveBase()
-        savePath = saveBase + "-analysis.csv"
-
-        logger.info(savePath)
-
-        df.to_csv(savePath)
+        if df is not None:
+            df.to_csv(path, mode="a")
+        # else:
+            # happens when user sets metaDat but does not do analysis
+            # logger.warning(f'asDataFrame() returned None')
+            # logger.warning(f'  did not save: {self}')
 
     def saveAnalysis(self, forceSave=False):
         """Not used.
@@ -2396,13 +2614,13 @@ class bAnalysis:
         """
         All analysis will be saved in folder 'sanpy_analysis'
         """
-        parentPath, fileName = os.path.split(self._path)
+        filepath = self.fileLoader.filepath
+        parentPath, fileName = os.path.split(filepath)
         saveFolder = os.path.join(parentPath, "sanpy_analysis")
         return saveFolder
 
     def _getSaveBase(self):
-        """
-        Return basename to append to to save
+        """Get basename to append to to save
 
         This will always be in a subfolder named 'sanpy_analysis'
 
@@ -2410,7 +2628,8 @@ class bAnalysis:
         """
         saveFolder = self._getSaveFolder()
 
-        parentPath, fileName = os.path.split(self._path)
+        filepath = self.fileLoader.filepath
+        parentPath, fileName = os.path.split(filepath)
         baseName = os.path.splitext(fileName)[0]
         savePath = os.path.join(saveFolder, baseName)
 

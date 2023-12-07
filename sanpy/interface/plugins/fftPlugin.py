@@ -873,7 +873,8 @@ class fftPlugin(sanpyPlugin):
             logger.warning(
                 f"fft plugin can only show one sweep, received sweepNumber:{self.sweepNumber}"
             )
-            return
+            logger.warning('Defaulting to sweep 0')
+            self._sweepNumber = 0
 
         # logger.info(f'using ba: {self.ba}')
         startSec, stopSec = self.getStartStop()
@@ -1184,7 +1185,7 @@ class fftPlugin(sanpyPlugin):
         # logger.info(f'Took {stop-start} seconds.')
 
         #
-        self.static_canvas.draw()
+        # self.static_canvas.draw()
 
     def appendResultsStr(self, str, maxFreq="", maxPsd="", freqs="", psd=""):
         self._resultStr += str + "\n"

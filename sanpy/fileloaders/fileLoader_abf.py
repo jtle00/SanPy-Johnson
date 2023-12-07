@@ -114,9 +114,17 @@ class fileLoader_abf(fileLoader_base):
 
             # turned back on when implementing Santana rabbit Ca kymographs
             abfDateTime = self._abf.abfDateTime  # 2019-01-14 15:20:48.196000
-            self._acqDate = abfDateTime.strftime("%Y-%m-%d")
-            self._acqTime = abfDateTime.strftime("%H:%M:%S")
+            
+            acqDate = abfDateTime.strftime("%Y-%m-%d")
+            acqTime = abfDateTime.strftime("%H:%M:%S")
+            logger.info(f'acqDate:"{acqDate}')
+            logger.info(f'acqTime:"{acqTime}')
+            # self._acqDate = abfDateTime.strftime("%Y-%m-%d")
+            # self._acqTime = abfDateTime.strftime("%H:%M:%S")
 
+            self.setAcqDate(acqDate)
+            self.setAcqTime(acqTime)
+            
             self._numChannels = len(self._abf.adcUnits)
             if self._numChannels > 1:
                 logger.warning(
@@ -149,3 +157,8 @@ class fileLoader_abf(fileLoader_base):
         # base sanpy does not keep the abf around
         # logger.warning('[[[TURNED BACK ON]]] I turned off assigning self._abf=None for stoch-res stim file load')
         self._abf = None
+
+if __name__ == '__main__':
+    path = '/Users/cudmore/Dropbox/data/wu-lab-stanford/tang/R1_S1_IC_AP_Family.abf'
+    
+    abf = pyabf.ABF(path)

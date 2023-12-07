@@ -11,8 +11,9 @@ import scipy.signal
 
 import sanpy.fileloaders
 
-from sanpy.sanpyLogger import get_logger
+import sanpy.metaData
 
+from sanpy.sanpyLogger import get_logger
 logger = get_logger(__name__)
 
 
@@ -20,7 +21,6 @@ def getFileLoaders(verbose: bool = False) -> dict:
     """Load file loaders from both
 
     1) Module sanpy.fileloaders
-
     2) Folder <user>/Documents/SanPy/File Loaders
 
     Each file loader is a class derived from [fileLoader_base](../../api/fileloader/fileLoader_base.md)
@@ -34,8 +34,10 @@ def getFileLoaders(verbose: bool = False) -> dict:
     """
     retDict = {}
 
-    ignoreModuleList = ["fileLoader_base", "recordingModes"]
+    ignoreModuleList = ["fileLoader_base", "recordingModes", "epochTable", "hekaUtils"]
 
+    if not sanpy.DO_KYMOGRAPH_ANALYSIS:
+        ignoreModuleList.append('fileLoader_tif')
     #
     # system file loaders from sanpy.fileloaders
     loadedList = []
@@ -44,6 +46,8 @@ def getFileLoaders(verbose: bool = False) -> dict:
             if verbose:
                 logger.info(f"moduleName:{moduleName}")
             if moduleName in ignoreModuleList:
+                if verbose:
+                    logger.info(f'IGNORING {moduleName}')
                 continue
             loadedList.append(moduleName)
             fullModuleName = "sanpy.fileloaders." + moduleName
@@ -195,15 +199,30 @@ class fileLoader_base(ABC):
 
         super().__init__()
 
+        logger.info(filepath)
+
         self._loadError = False
 
         self._path = filepath
+
+        self._metaData = sanpy.metaData.MetaData()  # per file metadata
 
         self._filteredY : np.ndarray = None  # set in _getDerivative
         self._filteredDeriv : np.ndarray = None
         self._currentSweep: int = 0
 
         self._epochTableList: List[sanpy.fileloaders.epochTable] = None
+
+        self._sweepX = None
+        self._sweepY = None
+        self._sweepC = None
+        self._numSweeps = None
+        self._sweepList = None
+        self._sweepLengthSec = None
+        self._dataPointsPerMs = None
+        self._recordingMode = recordingModes.unknown
+        self._sweepLabelX = None
+        self._sweepLabelY = None
 
         # load file from inherited class
         self.loadFile()
@@ -215,6 +234,22 @@ class fileLoader_base(ABC):
         """Get a short string representing this file."""
         txt = f"file: {self.filename} sweeps: {self.numSweeps} dur (Sec):{self.recordingDur}"
         return txt
+
+    @property
+    def metadata(self):
+        return self._metaData
+    
+    def setAcqDate(self, value):
+        self.metadata.setMetaData('Acq Date', value, triggerDirty=False)
+
+    def setAcqTime(self, value):
+        self.metadata.setMetaData('Acq Time', value, triggerDirty=False)
+
+    def getLoadError(self) -> bool:
+        return self._loadError
+    
+    def setLoadError(self, value : bool):
+        self._loadError = value
 
     def isKymograph(self) -> bool:
         return isinstance(self, sanpy.fileloaders.fileLoader_tif)
@@ -422,6 +457,8 @@ class fileLoader_base(ABC):
         # logger.info(f'  _filteredY:{self._filteredY.shape}')
         # logger.info(f'  2- _filteredDeriv:{self._filteredDeriv.shape}')
 
+        return self._filteredDeriv
+    
     @property
     def sweepY_filtered(self) -> np.ndarray:
         """Get a filtered version of sweepY."""
@@ -481,7 +518,7 @@ class fileLoader_base(ABC):
             The point in the recording corresponding to ms
         """
         theRet = ms * self.dataPointsPerMs
-        theRet = round(theRet)
+        theRet = int(round(theRet))
         return theRet
 
     def getEpochTable(self, sweep: int):
@@ -553,8 +590,16 @@ class fileLoader_base(ABC):
         dtSeconds = self._sweepX[1, 0] - self._sweepX[0, 0]  # seconds per sample
         dtSeconds = float(dtSeconds)
         dtMilliseconds = dtSeconds * 1000
-        _dataPointsPerMs = int(1 / dtMilliseconds)
-        # logger.info(f'dtSeconds:{dtSeconds} dtMilliseconds:{dtMilliseconds} _dataPointsPerMs:{_dataPointsPerMs}')
+        # july 2023 paula
+        # _dataPointsPerMs = int(1 / dtMilliseconds)
+        _dataPointsPerMs = 1 / dtMilliseconds
+        
+        if _dataPointsPerMs == 0:
+            logger.error(f'_dataPointsPerMs is zero!')
+            logger.error(f'  dtSeconds:{dtSeconds}')
+            logger.error(f'  dtMilliseconds:{dtMilliseconds}')
+            logger.error(f'  _dataPointsPerMs = int(1 / dtMilliseconds)')
+
         self._dataPointsPerMs: int = _dataPointsPerMs
 
         self._recordingMode: recordingModes = recordingMode

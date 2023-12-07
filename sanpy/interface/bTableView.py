@@ -246,13 +246,14 @@ class bTableView(QtWidgets.QTableView):
 
         logger.info(f"=== User click row:{realRow} relPath:{rowDict['relPath']}")
 
-        # always emit on clip, keep track if row was already selected
+        # always emit on click, keep track if row was already selected
         # if self.lastSeletedRow is None or self.lastSeletedRow != realRow:
         if 1:
             selectedAgain = self.lastSeletedRow == realRow
             # new row selection
             # print('  new row selection')
             # logger.info(f'realRow:{realRow} rowDict:{rowDict}')
+            logger.info(f'-->> emit signalSelectRow')
             self.signalSelectRow.emit(realRow, rowDict, selectedAgain)
         else:
             # print('  handle another click on already selected row')
@@ -299,15 +300,16 @@ class bTableView(QtWidgets.QTableView):
 
         # hide some columns, needed each time we set the model
         hiddenColumns = [
-            "kLeft",
-            "kTop",
-            "kRight",
-            "kBottom",
-            "Channels",
+            # "kLeft",
+            # "kTop",
+            # "kRight",
+            # "kBottom",
+            # "Channels",
+            "Species",
             "Cell Type",
-            "Sex",
-            "Condition",
-            "Notes",
+            # "Sex",
+            # "Condition",
+            # "Notes",
             "relPath",
             "uuid",
             "badColumn",
@@ -318,7 +320,7 @@ class bTableView(QtWidgets.QTableView):
                 # print('xxx hiding column', hiddenColumn, columnIdx)
                 self.setColumnHidden(columnIdx, True)
             except ValueError as e:
-                logger.error(f"Did not find column {hiddenColumn}")
+                logger.error(f"Called setColumnHidden() but did not find column {hiddenColumn}")
 
         """
         self.frozenTableView.setModel(self.model())
@@ -359,8 +361,10 @@ class bTableView(QtWidgets.QTableView):
         # contextMenu.addSeparator()
         findNewFiles = contextMenu.addAction("Sync With Folder")
         contextMenu.addSeparator()
-        saveAllAnalysis = contextMenu.addAction("Save All Analysis")
-        contextMenu.addSeparator()
+
+        # saveAllAnalysis = contextMenu.addAction("Save All Analysis")
+        # contextMenu.addSeparator()
+
         copyTable = contextMenu.addAction("Copy Table")
 
         # contextMenu.addSeparator()
@@ -402,12 +406,15 @@ class bTableView(QtWidgets.QTableView):
         elif action == copyTable:
             # self.signalCopyTable.emit()
             self.model().myCopyTable()
+            self.signalUpdateStatus.emit(f'File list copied to clipboard, can be pasted into a spreadsheet')
+
         elif action == findNewFiles:
             # self.signalFindNewFiles.emit()
             self.model().mySyncDfWithPath()
-        elif action == saveAllAnalysis:
-            # self.signalSaveFileTable.emit()
-            self.model().mySave()
+
+        # elif action == saveAllAnalysis:
+        #     # self.signalSaveFileTable.emit()
+        #     self.model().mySave()
 
         # not sure what this was supposed to do
         # elif action in [saNodeParams, ventricularParams, neuronParams, subthresholdParams]:

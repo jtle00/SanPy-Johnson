@@ -15,13 +15,10 @@ from pyqtgraph.exporters import ImageExporter
 
 import sanpy
 import sanpy.bDetection
-
-# import sanpy.interface.kymographWidget
+import sanpy.interface
 
 from sanpy.sanpyLogger import get_logger
-
 logger = get_logger(__name__)
-
 
 class bDetectionWidget(QtWidgets.QWidget):
     signalSelectSpike = QtCore.pyqtSignal(object)  # spike number, doZoom
@@ -32,7 +29,7 @@ class bDetectionWidget(QtWidgets.QWidget):
 
     def __init__(
         self,
-        ba: sanpy.bAnalysis = None,
+        ba: "sanpy.bAnalysis" = None,
         mainWindow: "sanpy.interface.SanPyWindow" = None,
         parent=None,
     ):
@@ -57,11 +54,11 @@ class bDetectionWidget(QtWidgets.QWidget):
         self.dvdtLinesFiltered = None
         self.dacLines = None
         self.vmLines = None
-        self.vmLinesFiltered = None
-        self.vmLinesFiltered2 = None
+        # self.vmLinesFiltered = None
+        # self.vmLinesFiltered2 = None
         self.linearRegionItem2 = None  # rectangle over global Vm
-        self.clipLines = None
-        self.meanClipLine = None
+        # self.clipLines = None
+        # self.meanClipLine = None
 
         self._showCrosshair = False
 
@@ -191,7 +188,7 @@ class bDetectionWidget(QtWidgets.QWidget):
             # },
 
         ]
-
+        
         # for kymograph
         # self.myImageItem = None  # kymographImage
         # self.myLineRoi = None
@@ -226,6 +223,129 @@ class bDetectionWidget(QtWidgets.QWidget):
             showPlotOption = windowOptions["detectionPanels"]["Set Spikes"]
             self.toggleInterface("Set Spikes", showPlotOption)
 
+            showPlotOption = windowOptions["detectionPanels"]["Set Meta Data"]
+            self.toggleInterface("Set Meta Data", showPlotOption)
+
+    def slot_contextMenu(self, plotName : str, plot, pos):
+        """Some plot widgets (vmPlot, derivPlot) have their context menu set to here.
+        
+        This is necc. as we need to know which plot it is coming from (as compared to the entire detectionWidget.
+        """
+        # logger.info(f'{plotName}')
+        pos = plot.mapToGlobal(pos)
+        self._myContextMenuEvent(plotName, pos)
+
+    # july 2023, moved from multi line
+    def _myContextMenuEvent(self, plotName, pos):
+        """Show popup context menu in response to right(command)+click.
+        
+        This is inherited from QWidget.
+        """
+
+        contextMenu = QtWidgets.QMenu()
+
+        showCrosshairAction = contextMenu.addAction(f"Crosshair")
+        showCrosshairAction.setCheckable(True)
+        showCrosshairAction.setChecked(self._showCrosshair)
+        
+        inVmPlot = plotName == 'vmPlot'  #self.vmPlot.sceneBoundingRect().contains(event.pos())
+        inDerivPlot = plotName == 'derivPlot'  #self.derivPlot.sceneBoundingRect().contains(event.pos())
+
+        if inVmPlot:
+            _cursorAction = self._sanpyCursors.getMenuActions(contextMenu)
+        if inDerivPlot:
+            _cursorAction2 = self._sanpyCursors_dvdt.getMenuActions(contextMenu)
+        
+        contextMenu.addSeparator()
+
+        # exportTraceAction = contextMenu.addAction(f"Export Trace {myType}")
+        # contextMenu.addSeparator()
+
+        resetAllAxisAction = contextMenu.addAction(f"Reset All Axis")
+        resetYAxisAction = contextMenu.addAction(f"Reset Y-Axis")
+        # openAct = contextMenu.addAction("Open")
+        # quitAct = contextMenu.addAction("Quit")
+        # action = contextMenu.exec_(self.mapToGlobal(event.pos()))
+
+        # show menu
+        action = contextMenu.exec_(pos)
+        if action is None:
+            return
+        
+        actionText = action.text()
+        # if actionText == f"Export Trace {myType}":
+        #     #
+        #     # See: plugins/exportTrace.py
+        #     #
+
+        #     # print('Opening Export Trace Window')
+
+        #     # todo: pass xMin,xMax to constructor
+        #     if self.myType == "vmFiltered":
+        #         xyUnits = ("Time (sec)", "Vm (mV)")
+        #     elif self.myType == "dvdtFiltered":
+        #         xyUnits = ("Time (sec)", "dV/dt (mV/ms)")
+        #     elif self.myType == "meanclip":
+        #         xyUnits = ("Time (ms)", "Vm (mV)")
+        #     else:
+        #         logger.error(f'Unknown myType: "{self.myType}"')
+        #         xyUnits = ("error time", "error y")
+
+        #     path = self.detectionWidget.ba.fileLoader.filepath
+
+        #     xMin, xMax = self.detectionWidget.getXRange()
+
+        #     if self.myType in ["vm", "dvdt"]:
+        #         xMargin = 2  # seconds
+        #     else:
+        #         xMargin = 2
+
+        #     exportWidget = sanpy.interface.bExportWidget(
+        #         self.x,
+        #         self.y,
+        #         xyUnits=xyUnits,
+        #         path=path,
+        #         xMin=xMin,
+        #         xMax=xMax,
+        #         xMargin=xMargin,
+        #         type=self.myType,
+        #         darkTheme=self.detectionWidget.useDarkStyle,
+        #     )
+
+        #     exportWidget.myCloseSignal.connect(self.slot_closeChildWindow)
+        #     exportWidget.show()
+
+        #     self.exportWidgetList.append(exportWidget)
+
+        if actionText == "Reset All Axis":
+            # print('Reset Y-Axis', self.myType)
+            self.setAxisFull()
+
+        elif actionText == "Reset Y-Axis":
+            # print('Reset Y-Axis', self.myType)
+            self.setAxisFull_y(self.myType)
+
+        elif actionText == 'Crosshair':
+            isChecked = action.isChecked()
+            #isChecked = not isChecked
+            logger.info(f'{actionText} {isChecked}')
+            self.toggleCrosshair(isChecked)
+            
+        elif actionText == 'Cursors':
+            isChecked = action.isChecked()
+            logger.info(f'{actionText} {isChecked}')
+            self._sanpyCursors.toggleCursors(isChecked)
+            self._sanpyCursors_dvdt.toggleCursors(isChecked)
+        else:
+            isChecked = action.isChecked()
+            if inVmPlot:
+                _handled = self._sanpyCursors.handleMenu(actionText, isChecked)
+            if inDerivPlot:
+                _handled = self._sanpyCursors_dvdt.handleMenu(actionText, isChecked)
+
+            if not _handled:
+                logger.warning(f"action not taken: {action}")
+
     @property
     def sweepNumber(self):
         """Get the current sweep number (from bAnalysis)."""
@@ -237,7 +357,7 @@ class bDetectionWidget(QtWidgets.QWidget):
     def detect(
         self,
         detectionPresetStr: str,
-        detectionType: sanpy.bDetection.detectionTypes,
+        detectionType: "sanpy.bDetection.detectionTypes",
         dvdtThreshold: float,
         mvThreshold: float,
         startSec: float = None,
@@ -354,7 +474,7 @@ class bDetectionWidget(QtWidgets.QWidget):
 
     def getMainWindowDetectionClass(self):
         """The detection class loads a number of json files.
-        When running SanPy app do this one.
+        When running SanPy app do this once.
         """
         theRet = None
         if self.myMainWindow is not None:
@@ -422,6 +542,7 @@ class bDetectionWidget(QtWidgets.QWidget):
     def _setAxis(self, start, stop, set_xyBoth="xAxis", whichPlot="vm"):
         """Shared by (setAxisFull, setAxis)."""
         # make sure start/stop are in correct order and swap if necc.
+        logger.info('')
         if start is not None and stop is not None:
             if stop < start:
                 tmp = start
@@ -436,6 +557,7 @@ class bDetectionWidget(QtWidgets.QWidget):
                 start = 0
                 stop = self.ba.fileLoader.recordingDur
 
+            logger.info('!!!! SETING X !!!')
             # self.derivPlot.setXRange(start, stop, padding=padding) # linked to Vm
             self.vmPlot.setXRange(start, stop, padding=padding)  # linked to Vm
 
@@ -519,16 +641,20 @@ class bDetectionWidget(QtWidgets.QWidget):
         if self.ba is None:
             return
 
+        # logger.info('')
+
         # 20220115
         # self.vmPlot.autoRange(items=[self.vmLinesFiltered])
         # self.vmPlot.enableAutoRange()
-        self.vmPlot.autoRange()  # 20221003
-
+        
+        logger.info('!!!!! setting vmPlot_ auto range !!!!!')
+        self.vmPlot.autoRange(items=[self.vmPlot_])  # 20221003
+    
         # these are linked to vmPlot
         # self.derivPlot.autoRange()
         # self.dacPlot.autoRange()
 
-        self.vmPlotGlobal.autoRange(items=[self.vmLinesFiltered2])  # we never zoom this
+        self.vmPlotGlobal.autoRange(items=[self.vmPlotGlobal_])  # we never zoom this
 
         # self.refreshClips(None, None)
         # self.clipPlot.autoRange()
@@ -539,6 +665,9 @@ class bDetectionWidget(QtWidgets.QWidget):
         # kymograph
         # self.myKymWidget.kymographPlot.setXRange(start, stop, padding=padding)  # row major is different
         #self.myKymWidget.kymographPlot.autoRange()  # row major is different
+        if sanpy.DO_KYMOGRAPH_ANALYSIS:
+            if self.ba.fileLoader.isKymograph():
+                self.myKymWidget.kymographPlot.autoRange()
 
         #
         # update detection toolbar
@@ -749,6 +878,7 @@ class bDetectionWidget(QtWidgets.QWidget):
         oneIndex : int
             If specified then replot just one overlay from self.myPlots
         """
+    
         if self.ba is None:
             return
 
@@ -756,10 +886,12 @@ class bDetectionWidget(QtWidgets.QWidget):
         # if _spikeNumbers is None then no spikes
         _spikeNumbers = self.ba.getStat('spikeNumber', sweepNumber=self.sweepNumber)
         
+        # logger.info(f'self.sweepNumber:{self.sweepNumber} _spikeNumbers:{_spikeNumbers}')
+
         _n = None
         if _spikeNumbers is not None:
             _n = len(_spikeNumbers)
-        logger.info(f'fetching {_n} markers and colors -- WILL  BE SLOW')
+        # logger.info(f'fetching {_n} markers and colors -- WILL  BE SLOW')
         
         _plotMarkerDict = sanpy.interface.plugins.getPlotMarkersAndColors(self.ba, _spikeNumbers)
         markerList_pg = _plotMarkerDict['markerList_pg']
@@ -898,8 +1030,10 @@ class bDetectionWidget(QtWidgets.QWidget):
         # always replot everything
         self.replotOverlays(oneIndex=idx)
 
-    def selectSweep(
-        self, sweepNumber, startSec=None, stopSec=None, doEmit=True, doReplot=True
+    def selectSweep(self,
+        sweepNumber : int,
+        startSec=None, stopSec=None,
+        doEmit=True, doReplot=True
     ):
         """
         Parameters
@@ -914,7 +1048,7 @@ class bDetectionWidget(QtWidgets.QWidget):
             If True then call _replot()
         """
         if sweepNumber == "":
-            logger.error("")
+            logger.error(f'got unexpected swep number "{sweepNumber}" {type(sweepNumber)}')
             return
 
         if sweepNumber == "All":
@@ -947,6 +1081,7 @@ class bDetectionWidget(QtWidgets.QWidget):
             self._replot(startSec, stopSec)  # will set full axis
 
         if doEmit:
+            logger.info(f' -->> emit signalSelectSweep {sweepNumber}')
             self.signalSelectSweep.emit(self.ba, sweepNumber)
 
     def setSpikeStat(self, stat: str = "condition", value: str = "xxx"):
@@ -967,8 +1102,8 @@ class bDetectionWidget(QtWidgets.QWidget):
             doZoom:
             doEmit: If True then emit signalSelectSpike signal
         """
-        logger.info(f"spikeNumber:{spikeNumber} doZoom:{doZoom} doEmit:{doEmit}")
-        logger.warning(f"  converting to spike list selection")
+        # logger.info(f"spikeNumber:{spikeNumber} doZoom:{doZoom} doEmit:{doEmit}")
+        # logger.warning(f"  converting to spike list selection")
 
         # # march 11, 2023
 
@@ -995,8 +1130,8 @@ class bDetectionWidget(QtWidgets.QWidget):
 
         spikeList = [spikeNumber]
 
-        x = None
-        y = None
+        # x = None
+        # y = None
 
         # potentially move on to a new sweep (while implementing Thian data)
         if spikeNumber is not None:
@@ -1043,7 +1178,7 @@ class bDetectionWidget(QtWidgets.QWidget):
                 "thresholdSec", sweepNumber=self.sweepNumber
             )
             if sweepSpikeNumber < len(thresholdSeconds):
-                logger.info("    !!!! REMOVE HARD CODED ZOOM")
+                # logger.info("    !!!! REMOVE HARD CODED ZOOM")
                 # thresholdSecond = thresholdSeconds[spikeNumber]
                 thresholdSecond = thresholdSeconds[sweepSpikeNumber]
                 thresholdSecond = round(thresholdSecond, 3)
@@ -1071,7 +1206,7 @@ class bDetectionWidget(QtWidgets.QWidget):
                 stopSec = thresholdSecond + postSpikeClipWidth_sec
                 #stopSec = round(stopSec, 2)
                 # print('  spikeNumber:', spikeNumber, 'thresholdSecond:', thresholdSecond, 'startSec:', startSec, 'stopSec:', stopSec)
-                start = self.setAxis(startSec, stopSec)
+                self.setAxis(startSec, stopSec)
 
         if doEmit:
             eDict = {
@@ -1176,57 +1311,57 @@ class bDetectionWidget(QtWidgets.QWidget):
             self.signalSelectSpikeList.emit(eDict)
             self._blockSlots = False
 
-    def _old_refreshClips(self, xMin=None, xMax=None):
-        if not self.clipPlot.isVisible():
-            # clips are not being displayed
-            # logger.info('Clips not visible --- RETURNING')
-            return
+    # def _old_refreshClips(self, xMin=None, xMax=None):
+    #     if not self.clipPlot.isVisible():
+    #         # clips are not being displayed
+    #         # logger.info('Clips not visible --- RETURNING')
+    #         return
 
-        logger.info("")
+    #     logger.info("")
 
-        # always remove existing
-        # if there are no clips and we bail we will at least clear display
-        self.clipPlot.clear()
+    #     # always remove existing
+    #     # if there are no clips and we bail we will at least clear display
+    #     self.clipPlot.clear()
 
-        # if self.clipLines is not None:
-        #    self.clipPlot.removeItem(self.clipLines)
-        # if self.meanClipLine is not None:
-        #    self.clipPlot.removeItem(self.meanClipLine)
+    #     # if self.clipLines is not None:
+    #     #    self.clipPlot.removeItem(self.clipLines)
+    #     # if self.meanClipLine is not None:
+    #     #    self.clipPlot.removeItem(self.meanClipLine)
 
-        if self.ba is None:
-            return
+    #     if self.ba is None:
+    #         return
 
-        if self.ba.numSpikes == 0:
-            return
+    #     if self.ba.numSpikes == 0:
+    #         return
 
-        # this returns x-axis in ms
-        theseClips, theseClips_x, meanClip = self.ba.getSpikeClips(
-            xMin, xMax, sweepNumber=self.sweepNumber
-        )
+    #     # this returns x-axis in ms
+    #     theseClips, theseClips_x, meanClip = self.ba.getSpikeClips(
+    #         xMin, xMax, sweepNumber=self.sweepNumber
+    #     )
 
-        # convert clips to 2d ndarray ???
-        xTmp = np.array(theseClips_x)
-        # xTmp /= self.ba.dataPointsPerMs # pnt to ms
-        xTmp /= self.ba.fileLoader.dataPointsPerMs * 1000  # pnt to seconds
-        yTmp = np.array(theseClips)
+    #     # convert clips to 2d ndarray ???
+    #     xTmp = np.array(theseClips_x)
+    #     # xTmp /= self.ba.dataPointsPerMs # pnt to ms
+    #     xTmp /= self.ba.fileLoader.dataPointsPerMs * 1000  # pnt to seconds
+    #     yTmp = np.array(theseClips)
 
-        # print('refreshClips() xTmp:', xTmp.shape)
-        # print('refreshClips() yTmp:', yTmp.shape)
+    #     # print('refreshClips() xTmp:', xTmp.shape)
+    #     # print('refreshClips() yTmp:', yTmp.shape)
 
-        self.clipLines = MultiLine(xTmp, yTmp, self, allowXAxisDrag=False, type="clip")
-        self.clipPlot.addItem(self.clipLines)
+    #     self.clipLines = MultiLine(xTmp, yTmp, self, allowXAxisDrag=False, type="clip")
+    #     self.clipPlot.addItem(self.clipLines)
 
-        # print(xTmp.shape) # (num spikes, time)
-        self.xMeanClip = xTmp
-        if len(self.xMeanClip) > 0:
-            self.xMeanClip = np.nanmean(xTmp, axis=0)  # xTmp is in ms
-        self.yMeanClip = yTmp
-        if len(self.yMeanClip) > 0:
-            self.yMeanClip = np.nanmean(yTmp, axis=0)
-        self.meanClipLine = MultiLine(
-            self.xMeanClip, self.yMeanClip, self, allowXAxisDrag=False, type="meanclip"
-        )
-        self.clipPlot.addItem(self.meanClipLine)
+    #     # print(xTmp.shape) # (num spikes, time)
+    #     self.xMeanClip = xTmp
+    #     if len(self.xMeanClip) > 0:
+    #         self.xMeanClip = np.nanmean(xTmp, axis=0)  # xTmp is in ms
+    #     self.yMeanClip = yTmp
+    #     if len(self.yMeanClip) > 0:
+    #         self.yMeanClip = np.nanmean(yTmp, axis=0)
+    #     self.meanClipLine = MultiLine(
+    #         self.xMeanClip, self.yMeanClip, self, allowXAxisDrag=False, type="meanclip"
+    #     )
+    #     self.clipPlot.addItem(self.meanClipLine)
 
     def toggleInterface(self, item, on):
         """Visually toggle different portions of interface"""
@@ -1300,6 +1435,8 @@ class bDetectionWidget(QtWidgets.QWidget):
         elif item == "Plot Options":
             self.detectToolbarWidget.toggleInterface(item, on)
         elif item == "Set Spikes":
+            self.detectToolbarWidget.toggleInterface(item, on)
+        elif item == "Set Meta Data":
             self.detectToolbarWidget.toggleInterface(item, on)
 
         else:
@@ -1393,93 +1530,77 @@ class bDetectionWidget(QtWidgets.QWidget):
         # _hSplitter.addWidget(self.detectToolbarWidget)
         # self.myHBoxLayout_detect.addWidget(_hSplitter)
 
-        # kymograph, we need a vboxlayout to hollder (kym widget, self.view)
+        # kymograph, we need a vboxlayout to hold (kym widget, self.view)
         vBoxLayoutForPlot = QtWidgets.QVBoxLayout(self)
 
         # for publication, don't do kymographs
         # make a branch and get this working
-        if 0:
+        if sanpy.DO_KYMOGRAPH_ANALYSIS:
             self.myKymWidget = sanpy.interface.kymographWidget()
             self.myKymWidget.signalKymographRoiChanged.connect(self.slot_kymographChanged)
             self.myKymWidget.setVisible(False)
+            self.myKymWidget.showSliceLine(False)
             self.myKymWidget.showLineSlider(False)
             vBoxLayoutForPlot.addWidget(self.myKymWidget)
 
-        # was this
-        self.view = pg.GraphicsLayoutWidget()
-        self.view.show()
-
-        row = 0
-        colSpan = 1
-
-        # Kymograph, always build (hidden) and show/hide in replot based on self.ba.isKymograph
-        """
-        rowSpan = 1
-        self.kymographPlot = self.view.addPlot(row=row, col=0, rowSpan=rowSpan, colSpan=colSpan)
-        self.kymographPlot.enableAutoRange()
-        # turn off x/y dragging of deriv and vm
-        self.kymographPlot.setMouseEnabled(x=False, y=False)
-        # hide the little 'A' button to rescale axis
-        self.kymographPlot.hideButtons()
-        # turn off right-click menu
-        self.kymographPlot.setMenuEnabled(False)
-        # hide by default
-        self.kymographPlot.hide()  # show in _replot() if self.ba.isKymograph()
-
-        #if self.ba.isKymograph():
-        #    myTif = self.ba.tifData
-        #    self.myImageItem = kymographImage(myTif, axisOrder='row-major',
-        #                        rect=[0,0, self.ba.recordingDur, self.ba.tifData.shape[0]])
-
-        row += rowSpan
-        """
+        xPlotEmpty = []  # np.arange(0, _recordingDur)
+        yPlotEmpty = []  # xPlot * np.nan
 
         # addPlot return a plotItem
-        rowSpan = 1
-        self.vmPlotGlobal = self.view.addPlot(
-            row=row, col=0, rowSpan=rowSpan, colSpan=colSpan
-        )
-
+        self.vmPlotGlobal = pg.PlotWidget()
+        self.vmPlotGlobal_ = self.vmPlotGlobal.plot(name="vmPlotGlobal")
+        self.vmPlotGlobal_.setData(xPlotEmpty, yPlotEmpty, connect="finite")
+        vBoxLayoutForPlot.addWidget(self.vmPlotGlobal)
         self.vmPlotGlobal.enableAutoRange()
-        row += rowSpan
-        rowSpan = 1
-        self.derivPlot = self.view.addPlot(
-            row=row, col=0, rowSpan=rowSpan, colSpan=colSpan
-        )
 
+        self.derivPlot = pg.PlotWidget(name='derivPlot')
+        self.derivPlot_ = self.derivPlot.plot(name="derivPlot")
+        self.derivPlot_.setData(xPlotEmpty, yPlotEmpty, connect="finite")
+        vBoxLayoutForPlot.addWidget(self.derivPlot)
         self.derivPlot.enableAutoRange()
-        row += rowSpan
-        rowSpan = 1
-        self.dacPlot = self.view.addPlot(
-            row=row, col=0, rowSpan=rowSpan, colSpan=colSpan
-        )
+        self.derivPlot.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.derivPlot.customContextMenuRequested.connect(partial(self.slot_contextMenu,'derivPlot', self.derivPlot))
+
+        self.dacPlot = pg.PlotWidget()
+        self.dacPlot_ = self.dacPlot.plot(name="dacPlot")
+        self.dacPlot_.setData(xPlotEmpty, yPlotEmpty, connect="finite")
+        vBoxLayoutForPlot.addWidget(self.dacPlot)
         self.dacPlot.enableAutoRange()
 
-        row += rowSpan
-        rowSpan = 2  # make Vm plot taller than others
-        self.vmPlot = self.view.addPlot(
-            row=row, col=0, rowSpan=rowSpan, colSpan=colSpan
-        )
+        self.vmPlot = pg.PlotWidget(name='vmPlot')
+        # vmPlot_ is pyqtgraph.graphicsItems.PlotDataItem.PlotDataItem
+        self.vmPlot_ = self.vmPlot.plot(name="vmPlot")
+        self.vmPlot_.setData(xPlotEmpty, yPlotEmpty, connect="finite")
+        vBoxLayoutForPlot.addWidget(self.vmPlot)
         self.vmPlot.enableAutoRange()
+        # see: https://wiki.python.org/moin/PyQt/Handling%20context%20menus
+        self.vmPlot.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.vmPlot.customContextMenuRequested.connect(partial(self.slot_contextMenu,'vmPlot', self.vmPlot))
 
         # show hover text when showing crosshairs
         self._displayHoverText= pg.TextItem(text='xxx hover', color=(200,200,200), anchor=(1,1))
         self._displayHoverText.hide()
-        self.vmPlot.addItem(self._displayHoverText)
+        self.vmPlot.addItem(self._displayHoverText, ignorBounds=True)
 
         self._displayHoverText_deriv = pg.TextItem(text='xxx hover', color=(200,200,200), anchor=(1,1))
         self._displayHoverText_deriv.hide()
-        self.derivPlot.addItem(self._displayHoverText_deriv)
-
-        # row += rowSpan
-        # rowSpan = 1
-        # self.clipPlot = self.view.addPlot(row=row, col=0, rowSpan=rowSpan, colSpan=colSpan)
+        self.derivPlot.addItem(self._displayHoverText_deriv, ignorBounds=True)
 
         # link x-axis
-        # self.derivPlot.setXLink(self.vmPlot)
-        # self.dacPlot.setXLink(self.vmPlot)
+        self.derivPlot.setXLink(self.vmPlot)
+        self.dacPlot.setXLink(self.vmPlot)
         # self.myKymWidget.kymographPlot.setXLink(self.vmPlot)  # row major is different
 
+        # July 15, 2023
+        # cursors, start by adding to vmPlot
+        self._sanpyCursors = sanpy.interface.sanpyCursors(self.vmPlot)
+        self._sanpyCursors.signalCursorDragged.connect(self.updateStatusBar)
+        self._sanpyCursors.signalSetDetectionParam.connect(self._setDetectionParam)
+
+        self._sanpyCursors_dvdt = sanpy.interface.sanpyCursors(self.derivPlot)
+        self._sanpyCursors_dvdt.signalCursorDragged.connect(self.updateStatusBar)
+        self._sanpyCursors_dvdt.signalSetDetectionParam.connect(self._setDetectionParam)
+        
         #
         # mouse crosshair
         # crosshairPlots = ['derivPlot', 'dacPlot', 'vmPlot', 'clipPlot']
@@ -1527,10 +1648,13 @@ class bDetectionWidget(QtWidgets.QWidget):
         # we don't know the number of epochs until we have a ba?
 
         # trying to implement mouse moved events
-        self.myProxy = pg.SignalProxy(
-            self.vmPlot.scene().sigMouseMoved, rateLimit=60, slot=self._myMouseMoved
-        )
-        # self.vmPlot.scene().sigMouseMoved.connect(self._myMouseMoved)
+        # self.myProxy = pg.SignalProxy(
+        #     self.vmPlot.scene().sigMouseMoved, rateLimit=60, slot=self._myMouseMoved
+        # )
+        self.vmPlotGlobal.scene().sigMouseMoved.connect(partial(self._myMouseMoved, 'vmPlotGlobal'))
+        self.derivPlot.scene().sigMouseMoved.connect(partial(self._myMouseMoved, 'derivPlot'))
+        self.dacPlot.scene().sigMouseMoved.connect(partial(self._myMouseMoved, 'dacPlot'))
+        self.vmPlot.scene().sigMouseMoved.connect(partial(self._myMouseMoved, 'vmPlot'))
 
         # does not have setStyleSheet
         # self.derivPlot.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
@@ -1548,9 +1672,13 @@ class bDetectionWidget(QtWidgets.QWidget):
         self.dacPlot.setMenuEnabled(False)
         self.vmPlot.setMenuEnabled(False)
 
-        # 20221003 just link everything to vmPlot
-        self.derivPlot.setXLink(self.vmPlot)
-        self.dacPlot.setXLink(self.vmPlot)
+        # # 20221003 just link everything to vmPlot
+        # self.derivPlot.setXLink(self.vmPlot)
+        # self.dacPlot.setXLink(self.vmPlot)
+        
+        # #self.vmPlot.setXLink(self.myKymWidget.kymographPlot)
+        # self.myKymWidget.kymographPlot.setXLink(self.vmPlot)  # row major is different    
+        # # self.myKymWidget.myImageItem.setXLink(self.vmPlot)
 
         # turn off x/y dragging of deriv and vm
         self.vmPlotGlobal.setMouseEnabled(x=True, y=False)
@@ -1575,7 +1703,7 @@ class bDetectionWidget(QtWidgets.QWidget):
         self.mySpikeListScatterPlot = pg.ScatterPlotItem(
             pen=pg.mkPen(width=2, color=color), symbol=symbol, size=size
         )
-        self.vmPlot.addItem(self.mySpikeListScatterPlot)
+        self.vmPlot.addItem(self.mySpikeListScatterPlot, ignorBounds=True)
 
         # TODO: add this to application options
         _defaultScatterCircleSize = 8  # 6
@@ -1621,15 +1749,16 @@ class bDetectionWidget(QtWidgets.QWidget):
 
             # add plot to pyqtgraph
             if plot["plotOn"] == "vm":
-                self.vmPlot.addItem(myScatterPlot)
+                self.vmPlot.addItem(myScatterPlot, ignorBounds=True)
             elif plot["plotOn"] == "vmGlobal":
-                self.vmPlotGlobal.addItem(myScatterPlot)
+                self.vmPlotGlobal.addItem(myScatterPlot, ignorBounds=True)
             elif plot["plotOn"] == "dvdt":
-                self.derivPlot.addItem(myScatterPlot)
+                self.derivPlot.addItem(myScatterPlot, ignorBounds=True)
 
         self.replotOverlays()
 
-        vBoxLayoutForPlot.addWidget(self.view)
+        # was this june 4
+        # vBoxLayoutForPlot.addWidget(self.view)
 
         # v1
         self.myHBoxLayout_detect.addLayout(vBoxLayoutForPlot)
@@ -1637,6 +1766,44 @@ class bDetectionWidget(QtWidgets.QWidget):
         # _tmpSplitterWidget = QtWidgets.QWidget()
         # _tmpSplitterWidget.setLayout(vBoxLayoutForPlot)
         # _hSplitter.addWidget(_tmpSplitterWidget)
+
+    # def _cursorDragged(self, name, infLine):
+    #     # logger.info(f'{name} {infLine.pos()}')
+    #     xCursorA = self._cursorA.pos().x()
+    #     xCursorB = self._cursorB.pos().x()
+    #     delx = xCursorB - xCursorA
+    #     delx = round(delx, 4)
+    #     logger.info(f'delx:{delx}')
+
+    #     self._cursorB.label.setFormat(f'B\ndelx={delx}')
+    #     delStr = f'Cursor Delta X = {delx}'
+    #     self.updateStatusBar(delStr)
+
+    # def toggleCursors(self, visible : bool):
+    #     self._showCursors = visible
+    #     self._cursorA.setVisible(visible)
+    #     self._cursorB.setVisible(visible)
+        
+    #     if visible:
+    #         # set position to start/stop of current view
+    #         pass
+
+    def _setDetectionParam(self, detectionParam : str, value : float):
+        """Set a detection param.
+        
+        This is in response to sanpyCursors context menu.
+        """
+        # human name of detection type ('SA Node'', "Fast NEuron", etc)
+        selectedDetection = self.detectToolbarWidget._selectedDetection  # str
+
+        logger.info(f'selectedDetection{selectedDetection} detectionParam:{detectionParam} value:{value}')
+
+        _detectionClass = self.getMainWindowDetectionClass()
+        # detectionKey = _detectionClass.getDetectionKey(selectedDetection)
+        _detectionClass.setValue(selectedDetection, detectionParam, value)
+
+        # update the interface
+        self.detectToolbarWidget.on_detection_preset_change(selectedDetection)
 
     def toggleCrosshair(self, onOff):
         """Toggle mouse crosshair on and off.
@@ -1653,7 +1820,7 @@ class bDetectionWidget(QtWidgets.QWidget):
             self.crosshairDict[plotName]["h"].setVisible(onOff)
             self.crosshairDict[plotName]["v"].setVisible(onOff)
 
-    def _myMouseMoved(self, event):
+    def _myMouseMoved(self, inPlot, event):
         """Respond to mouse moves.
 
             Update cursor position
@@ -1665,22 +1832,32 @@ class bDetectionWidget(QtWidgets.QWidget):
 
         # looking directly at checkbox in myDetectionToolbarWidget2
         # _crossHairIsOn = self.detectToolbarWidget.crossHairCheckBox.isChecked()
-       #if not self.detectToolbarWidget.crossHairCheckBox.isChecked():
+        #if not self.detectToolbarWidget.crossHairCheckBox.isChecked():
         if not self._showCrosshair:
             return
 
-        pos = event[0]  ## using signal proxy turns original arguments into a tuple
+        # logger.info(f'"{inPlot}" {event}')
+
+        # pos = event[0]  ## using signal proxy turns original arguments into a tuple
+        pos = event
+
+        # logger.info(pos)
 
         x = None
         y = None
         mousePoint = None
-        inPlot = None
-        if self.derivPlot.sceneBoundingRect().contains(pos):
+        # inPlot = None
+        # if 0 and self.derivPlot.sceneBoundingRect().contains(pos):
+        if inPlot == 'derivPlot':
+            # logger.info('move in deriv')
             # deriv
-            inPlot = "derivPlot"
+            # inPlot = "derivPlot"
             self.crosshairDict[inPlot]["h"].show()
             self.crosshairDict[inPlot]["v"].show()
-            mousePoint = self.derivPlot.vb.mapSceneToView(pos)
+            # mousePoint = self.derivPlot.vb.mapSceneToView(pos)
+            #mousePoint = self.derivPlot.mapSceneToView(pos)
+            # mousePoint = self.derivPlot.scene().mapSceneToView()
+            mousePoint = self.derivPlot.getPlotItem().getViewBox().mapSceneToView(pos)
             # hide the horizontal in dacPlot
             self.crosshairDict["dacPlot"]["v"].show()
             self.crosshairDict["dacPlot"]["h"].hide()
@@ -1699,12 +1876,15 @@ class bDetectionWidget(QtWidgets.QWidget):
                 self._displayHoverText_deriv.setText(_hoverText)
                 self._displayHoverText_deriv.setPos(x, y)
 
-        elif self.dacPlot.sceneBoundingRect().contains(pos):
+        # elif 0 and self.dacPlot.sceneBoundingRect().contains(pos):
+        elif inPlot == 'dacPlot':
+            # logger.info('move in dac')
             # dac
-            inPlot = "dacPlot"
+            # inPlot = "dacPlot"
             self.crosshairDict[inPlot]["h"].show()
             self.crosshairDict[inPlot]["v"].show()
-            mousePoint = self.dacPlot.vb.mapSceneToView(pos)
+            # mousePoint = self.dacPlot.vb.mapSceneToView(pos)
+            mousePoint = self.dacPlot.getPlotItem().getViewBox().mapSceneToView(pos)
             # hide the horizontal in derivPlot
             self.crosshairDict["derivPlot"]["v"].show()
             self.crosshairDict["derivPlot"]["h"].hide()
@@ -1712,12 +1892,15 @@ class bDetectionWidget(QtWidgets.QWidget):
             self.crosshairDict["vmPlot"]["v"].show()
             self.crosshairDict["vmPlot"]["h"].hide()
 
-        elif self.vmPlot.sceneBoundingRect().contains(pos):
+        # elif self.vmPlot.sceneBoundingRect().contains(pos):
+        elif inPlot == 'vmPlot':
+            # logger.info('move in vm')
             # vm
-            inPlot = "vmPlot"
+            # inPlot = "vmPlot"
             self.crosshairDict[inPlot]["h"].show()
             self.crosshairDict[inPlot]["v"].show()
-            mousePoint = self.vmPlot.vb.mapSceneToView(pos)
+            # mousePoint = self.vmPlot.vb.mapSceneToView(pos)
+            mousePoint = self.vmPlot.getPlotItem().getViewBox().mapSceneToView(pos)
             # hide the horizontal in dacPlot
             self.crosshairDict["dacPlot"]["v"].show()
             self.crosshairDict["dacPlot"]["h"].hide()
@@ -1826,6 +2009,12 @@ class bDetectionWidget(QtWidgets.QWidget):
             logger.info(f'_pgPointSize:{self._pgPointSize}')
             self._replot()
 
+        elif key == QtCore.Qt.Key.Key_N:
+            # set metadata (note) of file loader
+            if self.ba is not None:
+                pass
+                # setMetaData
+
         # elif key == QtCore.Qt.Key_C:
         #     logger.warning("what was this for ??? responding to keyboard C ???")
         #     # self.setSpikeStat()
@@ -1853,12 +2042,16 @@ class bDetectionWidget(QtWidgets.QWidget):
         # self.signalDetect.emit(self.ba)  # underlying _abf has new rect
 
     def slot_selectSweep(self, sweep: int):
-        """Fake slot, not ising in emit/connect."""
+        """Fake slot, not using in emit/connect."""
         self.selectSweep(sweep)
         self.detectToolbarWidget.slot_selectSweep(sweep)
 
     def slot_selectSpike(self, sDict):
-        logger.info(f"detection widget {sDict}")
+        _str = '\n'
+        for k,v in sDict.items():
+            _str += f'          {k}:{v}\n'
+        _str = _str[:-1]
+        logger.info(_str)
 
         spikeNumber = sDict["spikeNumber"]
         doZoom = sDict["doZoom"]
@@ -1888,7 +2081,7 @@ class bDetectionWidget(QtWidgets.QWidget):
         #     spikeNumber = spikeList[0]
         # self.selectSpike(spikeNumber, doZoom=doZoom)
 
-    def slot_switchFile(self, ba: sanpy.bAnalysis = None, tableRowDict: dict = None):
+    def slot_switchFile(self, ba: "sanpy.bAnalysis" = None, tableRowDict: dict = None):
         """Switch to a new file.
 
         Set self.ba to new bAnalysis object ba
@@ -1902,7 +2095,7 @@ class bDetectionWidget(QtWidgets.QWidget):
 
         Returns: True/False
         """
-        logger.info(f"tableRowDict:{tableRowDict}")
+        # logger.info(f"tableRowDict:{tableRowDict}")
         logger.info(f"ba:{ba}")
 
         # bAnalysis object
@@ -1932,21 +2125,14 @@ class bDetectionWidget(QtWidgets.QWidget):
 
         # cancel spike selection
         self.selectSpikeList([])
-        # self.selectSpike(None)
-        # self.selectSpikeList(self._selectedSpikeList)
 
         # set sweep to 0
-        self.selectSweep(0, startSec, stopSec, doEmit=False, doReplot=False)
-
-        # set full axis
-        # abb 20220615
-        # self.setAxisFull()
+        self.selectSweep(0, doEmit=False, doReplot=False)
 
         # abb implement sweep, move to function()
         # abb 20220615
         self._replot(startSec, stopSec)
-
-        # self.refreshClips(startSec, stopSec)
+        # self._replot()
 
         # update x/y axis labels
         yLabel = self.ba.fileLoader._sweepLabelY
@@ -1957,10 +2143,31 @@ class bDetectionWidget(QtWidgets.QWidget):
         self.vmPlot.getAxis("left").setLabel(yLabel)
         self.vmPlot.getAxis("bottom").setLabel("Seconds")
 
-        #self.myKymWidget.slot_switchFile(ba, startSec, stopSec)
+        if sanpy.DO_KYMOGRAPH_ANALYSIS:
+            if self.ba.fileLoader.isKymograph():
+                self.myKymWidget.setVisible(True)
+                # self.myKymWidget.slot_switchFile(ba, startSec, stopSec)
+                self.vmPlot.setXLink(self.myKymWidget.kymographPlot)
+                # self.myKymWidget.kymographPlot.setXLink(self.vmPlot)  # row major is different
+                self.myKymWidget.slot_switchFile(ba)
+            else:
+                self.myKymWidget.setVisible(False)
+                # self.myKymWidget.kymographPlot.setXLink(None)  # row major is different
+                self.vmPlot.setXLink(None)
 
-        # reconnect relink x-axis
-        # self.myKymWidget.kymographPlot.setXLink(self.vmPlot)  # row major is different
+        #self.myKymWidget.kymographPlot.setXLink(self.vmPlot)  # row major is different    
+
+        # set full axis
+        # abb 20220615
+        # self.setAxisFull()
+        
+        # 20221003 just link everything to vmPlot
+        # self.derivPlot.setXLink(self.vmPlot)
+        # self.dacPlot.setXLink(self.vmPlot)
+        
+        # self.myKymWidget.kymographPlot.setXLink(self.vmPlot)  # row major is different    
+        # self.myKymWidget.myImageItem.setXLink(self.vmPlot)
+        # self.myKymWidget.setXLink(self.vmPlot)
 
         return True
 
@@ -2021,16 +2228,17 @@ class bDetectionWidget(QtWidgets.QWidget):
         # remove vm/dvdt/clip items (even when abf file is corrupt)
         # if self.dvdtLines is not None:
         #    self.derivPlot.removeItem(self.dvdtLines)
-        if self.dvdtLinesFiltered is not None:
-            self.derivPlot.removeItem(self.dvdtLinesFiltered)
-        if self.dacLines is not None:
-            self.dacPlot.removeItem(self.dacLines)
-        if self.vmLinesFiltered is not None:
-            self.vmPlot.removeItem(self.vmLinesFiltered)
-        if self.vmLinesFiltered2 is not None:
-            self.vmPlotGlobal.removeItem(self.vmLinesFiltered2)
-        if self.linearRegionItem2 is not None:
-            self.vmPlotGlobal.removeItem(self.linearRegionItem2)
+        # if self.dvdtLinesFiltered is not None:
+        #     self.derivPlot.removeItem(self.dvdtLinesFiltered)
+        # if self.dacLines is not None:
+        #     self.dacPlot.removeItem(self.dacLines)
+        # was this june 4
+        # if self.vmLinesFiltered is not None:
+        #     self.vmPlot.removeItem(self.vmLinesFiltered)
+        # if self.vmLinesFiltered2 is not None:
+        #     self.vmPlotGlobal.removeItem(self.vmLinesFiltered2)
+        # if self.linearRegionItem2 is not None:
+        #     self.vmPlotGlobal.removeItem(self.linearRegionItem2)
         # if self.clipLines is not None:
         #    self.clipPlot.removeItem(self.clipLines)
 
@@ -2050,43 +2258,51 @@ class bDetectionWidget(QtWidgets.QWidget):
 
         #
         if sweepX.shape != filteredDeriv.shape:
-            logger.error(f"shapes do not match")
+            logger.error(f"filteredDeriv shapes do not match")
 
-        self.dvdtLinesFiltered = MultiLine(
-            sweepX,
-            filteredDeriv,
-            self,
-            forcePenColor=None,
-            type="dvdtFiltered",
-            columnOrder=True,
-        )
-        # self.derivPlot.addItem(self.dvdtLines)
-        self.derivPlot.addItem(self.dvdtLinesFiltered)
+        self.derivPlot_.setData(sweepX, filteredDeriv, connect="finite")
+        # self.dvdtLinesFiltered = MultiLine(
+        #     sweepX,
+        #     filteredDeriv,
+        #     self,
+        #     forcePenColor=None,
+        #     type="dvdtFiltered",
+        #     columnOrder=True,
+        # )
+        # # self.derivPlot.addItem(self.dvdtLines)
+        # self.derivPlot.addItem(self.dvdtLinesFiltered)
 
-        self.dacLines = MultiLine(
-            sweepX, sweepC, self, forcePenColor=None, type="dac", columnOrder=True
-        )
-        self.dacPlot.addItem(self.dacLines)
+        self.dacPlot_.setData(sweepX, sweepC, connect="finite")
+        # self.dacLines = MultiLine(
+        #     sweepX, sweepC, self, forcePenColor=None, type="dac", columnOrder=True
+        # )
+        # self.dacPlot.addItem(self.dacLines)
 
-        self.vmLinesFiltered = MultiLine(
-            sweepX,
-            sweepY,
-            self,
-            forcePenColor=None,
-            type="vmFiltered",
-            allowXAxisDrag=True,  #default is True
-            columnOrder=True,
-        )
-        self.vmPlot.addItem(self.vmLinesFiltered)
+        # self.vmLinesFiltered = MultiLine(
+        #     sweepX,
+        #     sweepY,
+        #     self,
+        #     forcePenColor=None,
+        #     type="vmFiltered",
+        #     allowXAxisDrag=True,  #default is True
+        #     columnOrder=True,
+        # )
+        # self.vmPlot.addItem(self.vmLinesFiltered)
+        self.vmPlot_.setData(sweepX, sweepY, connect="finite")
+
+        # vmPlot_ is PlotDataItem
+        # logger.info(f'vmPlot.viewRange {self.vmPlot.viewRange()}')
 
         # april 30, 2023
-        self.vmPlot.sigXRangeChanged.connect(self._slot_x_range_changed)
+        # was this jun 4
+        # self.vmPlot.sigXRangeChanged.connect(self._slot_x_range_changed)
 
         # can't add a multi line to 2 different plots???
-        self.vmLinesFiltered2 = MultiLine(
-            sweepX, sweepY, self, forcePenColor="b", type="vmFiltered", columnOrder=True
-        )
-        self.vmPlotGlobal.addItem(self.vmLinesFiltered2)
+        # self.vmLinesFiltered2 = MultiLine(
+        #     sweepX, sweepY, self, forcePenColor="b", type="vmFiltered", columnOrder=True
+        # )
+        # self.vmPlotGlobal.addItem(self.vmLinesFiltered2)
+        self.vmPlotGlobal_.setData(sweepX, sweepY, connect="finite", pen='b')
         self.linearRegionItem2 = pg.LinearRegionItem(
             values=(0, self.ba.fileLoader.recordingDur),
             orientation=pg.LinearRegionItem.Vertical,
@@ -2094,7 +2310,7 @@ class bDetectionWidget(QtWidgets.QWidget):
             pen=pg.mkPen(None),
         )
         self.linearRegionItem2.setMovable(False)
-        self.vmPlotGlobal.addItem(self.linearRegionItem2)
+        self.vmPlotGlobal.addItem(self.linearRegionItem2, ignorBounds=True)
 
         # Kymograph
         # isKymograph = self.ba.fileLoader.isKymograph()
@@ -2113,13 +2329,13 @@ class bDetectionWidget(QtWidgets.QWidget):
 
             if plot["plotOn"] == "vm":
                 self.vmPlot.removeItem(plotItem)
-                self.vmPlot.addItem(plotItem)
+                self.vmPlot.addItem(plotItem, ignorBounds=True)
             elif plot["plotOn"] == "vmGlobal":
                 self.vmPlotGlobal.removeItem(plotItem)
-                self.vmPlotGlobal.addItem(plotItem)
+                self.vmPlotGlobal.addItem(plotItem, ignorBounds=True)
             elif plot["plotOn"] == "dvdt":
                 self.derivPlot.removeItem(plotItem)
-                self.derivPlot.addItem(plotItem)
+                self.derivPlot.addItem(plotItem, ignorBounds=True)
 
         # single spike selection
         """
@@ -2134,9 +2350,14 @@ class bDetectionWidget(QtWidgets.QWidget):
         # self.setAxisFull()
         # 20221003 was this
         # self.setAxis_OnFileChange(startSec, stopSec)
+        
+        # was this june 4
         self.setAxisFull()
+        
         # self.detectToolbarWidget.on_start_stop()
-        self._setAxis(start=startSec, stop=stopSec)
+        
+        # was this june 4
+        # self._setAxis(start=startSec, stop=stopSec)
 
         #
         # critical, replot() is inherited
@@ -2189,7 +2410,7 @@ class myImageExporter(ImageExporter):
 
 
 # class MultiLine(pg.QtGui.QGraphicsPathItem):
-class MultiLine(QtWidgets.QGraphicsPathItem):
+class _old_MultiLine(QtWidgets.QGraphicsPathItem):
     def __init__(
         self,
         x,
@@ -2499,11 +2720,12 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
 
         self._selectedDetection = None
 
+        self._blockSlots = False
+
         self._buildUI()
 
     def fillInDetectionParameters(self, tableRowDict):
-        """
-        Set detection widget interface (mostly QSpinBox) to match values from table
+        """Set detection widget interface (mostly QSpinBox) to match values from table
         """
 
         """
@@ -2560,13 +2782,14 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
         Fill in preset dv/dt and mV.
         Use this detection preset when user hits detect
         """
-        logger.info("")
+        logger.info(f'"{detectionTypeStr}"')
 
         # grab default (dv/dt, mv) from preset
         # detectionPreset = sanpy.bDetection.detectionPresets(detectionTypeStr)
         # detectionClass = sanpy.bDetection(detectionPreset=detectionPreset)
 
         self._selectedDetection = detectionTypeStr
+        
         detectionDict = (
             self.detectionWidget.getMainWindowDetectionClass().getDetectionDict(
                 self._selectedDetection
@@ -2633,7 +2856,8 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
         logger.info("TODO: update plots with plot every.")
 
     def _on_button_click(self, name):
-        """User clicked a button."""
+        """User clicked a button.
+        """
         logger.info(f'User clicked button "{name}"')
 
         modifiers = QtWidgets.QApplication.keyboardModifiers()
@@ -2643,10 +2867,8 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
             detectionPreset = self.detectionPresets.currentText()
 
             dvdtThreshold = self.dvdtThreshold.value()
-            # print(f'  dvdtThreshold:', dvdtThreshold, type(dvdtThreshold))
             mvThreshold = self.mvThreshold.value()
-            # print('    dvdtThreshold:', dvdtThreshold)
-            # print('    mvThreshold:', mvThreshold)
+
             if dvdtThreshold == 0:
                 # 0 is special value shown as 'None'
                 str = "Please set a threshold greater than 0"
@@ -2766,6 +2988,11 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
                 self.setSpikeGroupBox.show()
             else:
                 self.setSpikeGroupBox.hide()
+        elif panelName == "Set Meta Data":
+            if onoff:
+                self.setMetaDataGroupBox.show()
+            else:
+                self.setMetaDataGroupBox.hide()
         elif panelName == "Plot Options":
             if onoff:
                 self.plotGroupBox.show()
@@ -2865,6 +3092,7 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
 
         self.dvdtThreshold = QtWidgets.QDoubleSpinBox()
         self.dvdtThreshold.setToolTip("dV/dt threshold.")
+        self.dvdtThreshold.setDecimals(3)
         self.dvdtThreshold.setMinimum(0)
         self.dvdtThreshold.setMaximum(+1e6)
         self.dvdtThreshold.setValue(detectDvDt)
@@ -3082,6 +3310,29 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
         self.mainLayout.addWidget(self.setSpikeGroupBox)
 
         #
+        # SetMetaData group
+        self.setMetaDataGroupBox = QtWidgets.QGroupBox("Set Meta Data")
+        self.setContentsMargins(0,0,0,0)
+        setMetaDataLayout = QtWidgets.QHBoxLayout()
+        setMetaDataLayout.setContentsMargins(0,0,0,0)
+
+        # mar 11, created a setMetaData stat plugin
+        setMetaDataWidget = sanpy.interface.plugins.SetMetaData(
+            ba=self.detectionWidget.ba,
+            bPlugin=self.detectionWidget.myMainWindow.myPlugins,
+        )
+
+        # signalsetMetaData is now in sanpyPlugin base class
+        # setMetaDataWidget.signalsetMetaData.connect(
+        #     self.detectionWidget.slot_setMetaData
+        # )
+
+        setMetaDataLayout.addWidget(setMetaDataWidget)
+
+        self.setMetaDataGroupBox.setLayout(setMetaDataLayout)
+        self.mainLayout.addWidget(self.setMetaDataGroupBox)
+
+        #
         # plots  group
         self.plotGroupBox = QtWidgets.QGroupBox("Plot Options")
         # self.plotGroupBox.setContentsMargins(0,0,0,0)
@@ -3235,7 +3486,12 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
 
     def slot_selectSweep(self, sweep: int):
         """Fake slot, not ising in emit/connect."""
-        self.sweepComboBox.setCurrentIndex(sweep + 1)
+        
+        # logger.info(f'myDetectionToolbarWidget slot_selectSweep:{sweep}')
+
+        # +1 is for when we start combo box with 'All'
+        # self.sweepComboBox.setCurrentIndex(sweep + 1)
+        self.sweepComboBox.setCurrentIndex(sweep)
 
         # self.spikeNumber.setMaximum(+1e6)
         # self.spikeNumber.setValue(0)
@@ -3313,7 +3569,10 @@ class myDetectToolbarWidget2(QtWidgets.QWidget):
         for sweep in range(self.detectionWidget.ba.fileLoader.numSweeps):
             self.sweepComboBox.addItem(str(sweep))
         # always select sweep 0
-        self.sweepComboBox.setCurrentIndex(1)
+
+        # 1 was for when we had 'All'
+        self.sweepComboBox.setCurrentIndex(0)
+
         # if self.detectionWidget.ba.numSweeps == 1:
         #    # select sweep 0
         #    self.sweepComboBox.setCurrentIndex(1)

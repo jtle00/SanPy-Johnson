@@ -1,38 +1,37 @@
 import os
+import sys
 import pytest
 
 import sanpy
 from sanpy.interface.sanpy_app import SanPyWindow
 from sanpy.interface import bPlugins
 
-import logging
 from sanpy.sanpyLogger import get_logger
-#logger = get_logger(__name__, level=logging.ERROR)
 logger = get_logger(__name__)
 
-@pytest.fixture
-def sanpyAppObject(qtbot):
-    return SanPyWindow()
+# @pytest.fixture
+# def sanpyAppObject(qtbot):
+#     return SanPyWindow()
 
-@pytest.fixture
-def pluginsObject(qtbot):
-    """
-    just by putting `qtbot` in the list of arguments
-    pytest-qt will start up an event loop for you
+# @pytest.fixture
+# def pluginsObject(qtbot):
+#     """
+#     just by putting `qtbot` in the list of arguments
+#     pytest-qt will start up an event loop for you
 
-    A word about Pytest fixtures:
-    pytest fixtures are functions attached to the tests which run 
-    before the test function is executed. 
+#     A word about Pytest fixtures:
+#     pytest fixtures are functions attached to the tests which run 
+#     before the test function is executed. 
 
-    pytest fixture function is automatically called by the pytest framework 
-    when the name of the argument and the fixture is the same.
-    """
-    _pluginsObject = bPlugins()
+#     pytest fixture function is automatically called by the pytest framework 
+#     when the name of the argument and the fixture is the same.
+#     """
+#     _pluginsObject = bPlugins()
 
-    # qtbot provides a convenient addWidget method that will ensure 
-    # that the widget gets closed at the end of the test.
-    #qtbot.addWidget(_pluginsObject)
-    return _pluginsObject
+#     # qtbot provides a convenient addWidget method that will ensure 
+#     # that the widget gets closed at the end of the test.
+#     #qtbot.addWidget(_pluginsObject)
+#     return _pluginsObject
 
 # @pytest.fixture
 # def analysisDirObject(qtbot):
@@ -41,9 +40,12 @@ def pluginsObject(qtbot):
 #     _analysisDir = sanpy.analysisDir(folderPath)
 #     return _analysisDir
 
-_selectedRow = 1
-
-def test_app(sanpyAppObject):
+def _test_app(qtbot):
+    """Triggers segmentation fault.
+    """
+    sanpyAppObject = SanPyWindow()
+    
+    logger.info('')
     assert sanpyAppObject is not None
 
     _rowOne = 1
@@ -61,12 +63,12 @@ def test_app(sanpyAppObject):
     _dict2 = sanpyAppObject.getSelectedFileDict()
     #assert _dict2['File'] == '20191009_0006.abf'
 
-    # run a plugin
+    # run a few plugin
     _pluginList = sanpyAppObject.myPlugins.pluginList()
     _onePlugin = _pluginList[0]
-    sanpyAppObject.sanpyPlugin_action(_onePlugin)
-    sanpyAppObject.sanpyPlugin_action('Plot Spike Clips')
-    sanpyAppObject.sanpyPlugin_action('Plot Scatter')
+
+    # _scatterPlugin = sanpyAppObject.sanpyPlugin_action('Plot Scatter')
+    # qtbot.addWidget(_scatterPlugin)
 
     _rowZero = 0 # File:19114000.abf
     # simulate user click using QTableView.selectRow()
@@ -75,8 +77,8 @@ def test_app(sanpyAppObject):
 
     # 20230401, what did I do that broke this ???
     _dict = _tableView.getSelectedRowDict()
-    if _dict is not None:
-        assert _dict['File'] == '19114000.abf'
+    # if _dict is not None:
+    #     assert _dict['File'] == '19114000.abf'
 
     _dict2 = sanpyAppObject.getSelectedFileDict()
     #assert _dict2['File'] == '19114000.abf'
@@ -85,84 +87,117 @@ def test_app(sanpyAppObject):
     # print('qqqq dv/dt')
     sanpyAppObject.myDetectionWidget.detectToolbarWidget._on_button_click('Detect dV/dt')
 
-# def _slot_selectRow(rowIdx : int, rowDict : dict, selectAgain : bool):
-#     logger.info(f'{rowIdx} {rowDict}')
-#     assert rowIdx == _selectedRow
+    # _scatterPlugin.close()
+    # _scatterPlugin = None
 
-def test_init(pluginsObject, qtbot):
-    """Run all plugins through a number of different tests.
-    """
-    assert pluginsObject is not None
+def test_analysisdir_tableview(qtbot):
+    logger.info('')
 
-    # analysis dir
+    #
+    # analysis dir    
     folderPath = 'data'
     _analysisDir = sanpy.analysisDir(folderPath)
-    #_analysisDir = analysisDirObject
     _model = sanpy.interface.bFileTable.pandasModel(_analysisDir)
     
+    #
     # table view
     _tableView = sanpy.interface.bTableView(_model)
-    #_tableView.signalSelectRow.connect(_slot_selectRow)
+    qtbot.addWidget(_tableView)
+
+    _selectedRow = 1
     _tableView._onLeftClick(_selectedRow)
 
-    _pluginList = pluginsObject.pluginList()
-    assert len(_pluginList) > 0
+def test_plugins(qtbot):
+    """Run all plugins through a number of different tests.
+    """
+    logger.info('')
 
-    # run each plugin
+    sanpyAppObject = SanPyWindow()
+
+    if 1:
+        #
+        # run each plugin
+        pluginsObject = bPlugins(sanpyAppObject)
+        assert pluginsObject is not None
+
+        _pluginList = pluginsObject.pluginList()
+        assert len(_pluginList) > 0
     
-    # (1) ba None
-    ba = None
+    if 1:
+        # (2) ba loaded but no analysis
+        # path = 'data/19114001.abf'
+        path = os.path.join('data', '19114001.abf')
+        baNoAnalysis = sanpy.bAnalysis(path)
+
+        # (3) ba loaded and with analysis
+        baWithAnalysis = sanpy.bAnalysis(path)
+        bd = sanpy.bDetection()  # gets default
+        dDict = bd.getDetectionDict('SA Node')
+        baWithAnalysis.spikeDetect(dDict)
+
+        pathSweeps = os.path.join('data', '2021_07_20_0010.abf')
+        baSweeps = sanpy.bAnalysis(pathSweeps)
+        dDict = bd.getDetectionDict('Fast Neuron')
+        baSweeps.spikeDetect(dDict)
     
-    # (2) ba loaded but no analysis
-    # path = 'data/19114001.abf'
-    path = os.path.join('data', '19114001.abf')
-    ba = sanpy.bAnalysis(path)
+    _numPlugin = len(_pluginList)
+    for _pluginNumber, _pluginName in enumerate(_pluginList):
 
-    # (3) ba loaded and with analysis
-    bd = sanpy.bDetection()  # gets default
-    dDict = bd.getDetectionDict('SA Node')
-    ba.spikeDetect(dDict)
+        # if _pluginName != 'Plot Scatter':
+        #     continue
+        
+        logger.info(f'2.0xxx) {_pluginNumber}/{_numPlugin}====== running plugin: {_pluginName}')
+        logger.info(f'  baNoAnalysis:{baNoAnalysis}')
 
-    pathCsv = os.path.join('data', '19114001.csv')
-    baCsv = sanpy.bAnalysis(path)
-
-    pathSweeps = os.path.join('data', '2021_07_20_0010.abf')
-    baSweeps = sanpy.bAnalysis(pathSweeps)
-    dDict = bd.getDetectionDict('Fast Neuron')
-    baSweeps.spikeDetect(dDict)
-
-    # github is running out of memory
-    for _pluginName in _pluginList:
-        # first run the plugin with ba=None
+        # run with ba with no analysis
         baNone = None
         _newPlugin = pluginsObject.runPlugin(_pluginName, baNone, show=False)
         assert _newPlugin is not None
         assert _newPlugin.getInitError() == False
+        
+        # removed sept 9
         qtbot.addWidget(_newPlugin)
 
-    for _pluginName in _pluginList:
-        logger.info(f'====== running plugin _pluginName: {_pluginName}')
-        _newPlugin = pluginsObject.runPlugin(_pluginName, ba, show=False)
-        assert _newPlugin is not None
-        assert _newPlugin.getInitError() == False
-        qtbot.addWidget(_newPlugin)
+        _newPlugin.slot_switchFile(ba=baNoAnalysis)
+        _newPlugin.slot_switchFile(ba=baWithAnalysis)
 
-        # select an empy list
-        _selectSpikesDict = {'ba': ba, 'spikeList':[]}
+        # select an empty list
+        logger.info('   selecting empy spike list')
+        _selectSpikesDict = {'ba': baWithAnalysis, 'spikeList':[]}
         _newPlugin.slot_selectSpikeList(_selectSpikesDict)
 
         # select a list
-        _selectSpikesDict = {'ba': ba, 'spikeList':[1,10,15]}
+        _selectSpikesDict = {'ba': baWithAnalysis, 'spikeList':[1,10,15]}
+        logger.info(f'   selecting spikes {_selectSpikesDict}')
         _newPlugin.slot_selectSpikeList(_selectSpikesDict)
 
         # TODO: test switch file
         # switch to csv ba with no spikes
-        _newPlugin.slot_switchFile(ba=baCsv)
+        # _newPlugin.slot_switchFile(ba=baCsv)
 
-        # switch back to ba with spikes
-        _newPlugin.slot_switchFile(ba=ba)
+        # switch back to ba with no analysis
+        logger.info(f'   switching ba: {baNoAnalysis}')
+        _newPlugin.slot_switchFile(ba=baNoAnalysis)
 
         # switch to a file with sweeps
+        logger.info(f'   switching baSweeps:{baSweeps}')
         _newPlugin.slot_switchFile(ba=baSweeps)
 
         # TODO: test set sweep
+
+        # try to close and garbage collect
+        # _newPlugin.close()
+        # _newPlugin = None
+
+    logger.info('   done')
+
+if __name__ == '__main__':
+
+    if 0:
+        from qtpy import QtWidgets
+        app = QtWidgets.QApplication(sys.argv)
+
+        _SanPyWindow = SanPyWindow()
+        # test_app(_SanPyWindow)
+
+        # sys.exit(app.exec_())

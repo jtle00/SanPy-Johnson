@@ -242,11 +242,17 @@ class sanpyPlugin(QtWidgets.QWidget):
         if self.ba is not None:
             _numEpochs = self.ba.fileLoader.numEpochs  # can be None
             _showTop = self.ba.fileLoader.numSweeps>1
-            _showTop = _showTop | _numEpochs is not None and _numEpochs>2
+            _numEpoch = (_numEpochs is not None) and _numEpochs>2
+            _showTop = _showTop | _numEpoch
         self.toggleTopToobar(_showTop)  # initially hidden
         
         self._updateTopToolbar()
         self._vBoxLayout.addWidget(self._topToolbarWidget)
+
+    def getStatList(self) -> dict:
+        """Get all analysis results.
+        """
+        return self._bPlugins.getStatList()
 
     def _myClassName(self):
         return self.__class__.__name__
@@ -878,7 +884,7 @@ class sanpyPlugin(QtWidgets.QWidget):
         if not self._getResponseOption(self.responseTypes.setSweep):
             return
 
-        logger.info(f"{self._myClassName()}")
+        logger.info(f"{self._myClassName()} sweepNumber:{sweepNumber}")
 
         if ba is None:
             return

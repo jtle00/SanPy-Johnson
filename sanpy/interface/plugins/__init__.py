@@ -24,16 +24,17 @@ from .summarizeResults import SummarizeResults
 from .exportTrace import exportTrace
 
 from .fftPlugin import fftPlugin
+
 from .stimGen import stimGen
 
 from .detectionParams import detectionParams
 
 # remove for publication
-# from .kymographPlugin import kymographPlugin
-
-# from .kymographPlugin2 import kymographPlugin2
+from .kymographPlugin import kymographPlugin
 
 from .setSpikeStat import SetSpikeStat
+from .setMetaData import SetMetaData
+
 
 # eventually move this out of plotScatter
 from .plotScatter import myStatListWidget
@@ -41,5 +42,5 @@ from .plotScatter import getPlotMarkersAndColors
 
 from .plotFi import plotFi
 
-# TODO: make this just one line, so user can drop a bplugin inn and restart
+# TODO: make this just one line, so user can drop a bplugin in and restart
 from . import *
