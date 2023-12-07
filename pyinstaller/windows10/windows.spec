@@ -3,17 +3,17 @@
 
 block_cipher = None
 
+
 a = Analysis(
     ['..\\..\\sanpy\\interface\\sanpy_app.py'],
     pathex=[],
     binaries=[],
     datas=[('libblosc2.dll', 'tables'),
         ('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.png', '.'), # window icon
-        #('..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico', '.'), 
-        ('..\\..\\sanpy\\_userFiles','_userFiles')],
+        ('..\\..\\sanpy\\_userFiles','_userFiles'),
+        ('..\\..\\sanpy\\detection-presets', 'detection-presets')],
     hiddenimports=['tables', 'pkg_resources'],
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
@@ -43,5 +43,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.ico', # Desktop Icon
+    icon='..\\..\\sanpy\\interface\\icons\\sanpy_transparent.icns', # Desktop Icon
 )
+
