@@ -15,7 +15,7 @@ jobs:
     steps:
 
     - name: Create Executable
-      uses: jtle00/pyinstaller@v2
+      uses: jtle00/pyinstaller@v3
       with:
         python_ver: '3.9'
         spec: 'pyinstaller/windows10/windows.spec'
